@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // ← RiverpodだけでOK
+import 'package:frontend/layout/app_scaffold.dart';
 import 'theme/theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_page.dart';
 import 'screens/register_page.dart';
-import 'screens/home_page.dart';
 
 void main() {
   runApp(
@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
         '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
-        '/home': (context) => const HomePage(),
+        '/home': (context) => const AppScaffold(),
       },
     );
   }

@@ -1,36 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/svg.dart';
-import '../providers/tab_index_provider.dart';
 
-// タブバーのUIクラス
+// プロバイダー
+import '../providers/current_page_provider.dart';
+
+// タブページ
+import '../screens/home_tab_page.dart';
+import '../screens/timeline_tab_page.dart';
+import '../screens/worksite_tab_page.dart';
+import '../screens/schedule_tab_page.dart';
+import '../screens/chat_tab_page.dart';
+import '../screens/profile_tab_page.dart';
+
 class CustomTabBar extends ConsumerWidget {
   const CustomTabBar({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 現在のタブインデックスを監視
-    final currentIndex = ref.watch(tabIndexProvider);
+    // 今表示しているページ
+    final currentPage = ref.watch(currentPageProvider);
+
+    // 今どのタブが選ばれているかを特定（index化する）
+    int currentIndex = _getCurrentTabIndex(currentPage);
 
     return Container(
       decoration: BoxDecoration(
         border: Border(
           top: BorderSide(
-            color: Theme.of(context).colorScheme.outline, // ここ好きな色！
-            width: 1, // 太さ
+            color: Theme.of(context).colorScheme.outline,
+            width: 1,
           ),
         ),
       ),
-    
       child: BottomNavigationBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         type: BottomNavigationBarType.fixed,
         currentIndex: currentIndex,
         onTap: (index) {
-          // タップされたら更新
-          ref.read(tabIndexProvider.notifier).state = index;
+          // タップされたらページを切り替える！
+          ref.read(currentPageProvider.notifier).state = _getTabPageFromIndex(index);
         },
-
         items: [
           _buildTabBarItem(context, currentIndex, 0, 'ホーム', 'assets/icons/home.svg', 'assets/icons/bold_home.svg'),
           _buildTabBarItem(context, currentIndex, 1, 'タイムライン', 'assets/icons/timeline.svg', 'assets/icons/bold_timeline.svg'),
@@ -43,6 +53,38 @@ class CustomTabBar extends ConsumerWidget {
     );
   }
 
+  // 選択中タブのindexを判定する関数
+  int _getCurrentTabIndex(Widget currentPage) {
+    if (currentPage is HomeTabPage) return 0;
+    if (currentPage is TimelineTabPage) return 1;
+    if (currentPage is WorksiteTabPage) return 2;
+    if (currentPage is ScheduleTabPage) return 3;
+    if (currentPage is ChatTabPage) return 4;
+    if (currentPage is ProfileTabPage) return 5;
+    return 0; // デフォルト
+  }
+
+  // indexからページを返す関数
+  Widget _getTabPageFromIndex(int index) {
+    switch (index) {
+      case 0:
+        return const HomeTabPage();
+      case 1:
+        return const TimelineTabPage();
+      case 2:
+        return const WorksiteTabPage();
+      case 3:
+        return const ScheduleTabPage();
+      case 4:
+        return const ChatTabPage();
+      case 5:
+        return const ProfileTabPage();
+      default:
+        return const HomeTabPage();
+    }
+  }
+
+  // タブのアイテムUI
   BottomNavigationBarItem _buildTabBarItem(
     BuildContext context,
     int currentIndex,
@@ -56,13 +98,13 @@ class CustomTabBar extends ConsumerWidget {
 
     return BottomNavigationBarItem(
       icon: Container(
-        width: 40, // 丸背景のサイズ
+        width: 40,
         height: 40,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: isSelected
-              ? Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((255 * 0.5).round()) // 選択中だけグレー
-              : Colors.transparent, // 選択されてない時は背景なし
+              ? Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((255 * 0.5).round())
+              : Colors.transparent,
         ),
         child: Center(
           child: SvgPicture.asset(
@@ -76,3 +118,4 @@ class CustomTabBar extends ConsumerWidget {
     );
   }
 }
+
