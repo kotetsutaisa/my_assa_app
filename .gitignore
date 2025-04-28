@@ -1,0 +1,26 @@
+# Flutter
+build/
+.dart_tool/
+.packages
+.pub-cache/
+pubspec.lock
+
+# Django
+backend/__pycache__/
+backend/db.sqlite3
+backend/env/
+backend/.venv/
+backend/.mypy_cache/
+backend/staticfiles/
+
+# 共通
+venv/
+.idea/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.tmp
+.DS_Store
+*.swp
+*.swo
