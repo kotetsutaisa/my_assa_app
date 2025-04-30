@@ -5,8 +5,12 @@ import 'theme/theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_page.dart';
 import 'screens/register_page.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('ja'); // ← 日本語ロケールを初期化！
+
   runApp(
     const ProviderScope( // ← ProviderScopeだけ！
       child: MyApp(),
