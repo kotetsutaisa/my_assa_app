@@ -1,30 +1,14 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-
-# 会社情報を管理するモデル
-class Company(models.Model):
-    # 会社名
-    name = models.CharField(max_length=100)
-
-    # 業種（オプション）
-    industry = models.CharField(max_length=100, blank=True)
-
-    # 住所（オプション）
-    address = models.TextField(blank=True)
-
-    # 作成日時（自動保存）
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
-
+from companies.models import Company
+from django.utils.translation import gettext_lazy as _
 
 
 # ユーザーの役職を表す列挙型
 class Role(models.TextChoices):
-    ADMIN = 'admin', '管理者'
-    MANAGER = 'manager', '部長'
-    MEMBER = 'member', '一般'
+    ADMIN = 'admin', _('管理者')
+    MANAGER = 'manager', _('部長')
+    MEMBER = 'member', _('一般')
 
 
 

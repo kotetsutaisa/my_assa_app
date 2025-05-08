@@ -1,16 +1,16 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/widgets.dart';
-import 'package:http/http.dart' as http;
 import '../utils/token_manager.dart';
 import '../models/user_model.dart';
 import '../providers/user_provider.dart';
-
+import 'package:dio/dio.dart';
+import 'package:frontend/providers/dio_provider.dart';
 
 /// ユーザー登録APIを叩く関数（POST）
 /// 必要なユーザー情報をJSON形式で送信し、ステータス201で成功とみなす
 Future<Map<String, String>> registerUser({
+  required WidgetRef ref,
   required String username, // ユーザーの名前
   required String accountId, // ユーザーのアカウントID（@xxxx形式）
   required String email, // メールアドレス（ログイン用）
@@ -36,46 +36,31 @@ Future<Map<String, String>> registerUser({
   // パスワードの形式チェック
   final hasLetter = RegExp(r'[A-Za-z]').hasMatch(password);
   final hasNumber = RegExp(r'\d').hasMatch(password);
+  print('🟢 登録APIに送信: $username, $accountId, $email');
 
   if (!hasLetter || !hasNumber) {
     throw Exception('パスワードには英字と数字の両方を含めてください');
   }
 
-  const BASE_URL = 'http://172.20.10.2:8000';
-
-  // ★ 本番環境ではBASE_URLなどを使って変数化する（今は開発用URL）
-  final url = Uri.parse('$BASE_URL/api/users/register/');
+  final dio = ref.watch(dioProvider);
 
   try {
-    // APIにPOSTリクエスト送信（Content-Type: JSONで送る）
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'username': username,
-        'account_id': accountId,
-        'email': email,
-        'password': password,
-      }),
-    );
+    final response = await dio.post('users/register/', data: {
+      'username': username.trim(),
+      'account_id': accountId.trim(),
+      'email': email.trim(),
+      'password': password,
+    });
 
-    // レスポンスのステータスコードを確認
-    if (response.statusCode == 201) {
-      final resJson = jsonDecode(response.body);
-      final accessToken = resJson['access'];
-      final refreshToken = resJson['refresh'];
-      return {
-        'access': accessToken,
-        'refresh': refreshToken,
-      };
-    } else {
-      // サーバーからのエラーメッセージをパースして表示
-      final resJson = jsonDecode(response.body);
-      throw Exception(resJson.toString());
-    }
-  } catch (e) {
-    print('❌ 通信エラー: $e');
-    throw Exception('登録に失敗しました: $e');
+    final resJson = response.data;
+    return {
+      'access': resJson['access'],
+      'refresh': resJson['refresh'],
+    };
+
+  } on DioException catch(e) {
+    print('❌ 登録失敗: ${e.response?.data}');
+    throw Exception(e.response?.data.toString() ?? '登録に失敗しました');
   }
 }
 
@@ -83,6 +68,7 @@ Future<Map<String, String>> registerUser({
 /// 成功時：アクセストークンを返す
 /// 失敗時：Exception を throw
 Future<Map<String, String>> loginUser({
+  required WidgetRef ref,
   required String email,
   required String password,
 }) async {
@@ -96,85 +82,59 @@ Future<Map<String, String>> loginUser({
     throw Exception('パスワードは8文字以上で入力してください');
   }
 
-  const BASE_URL = 'http://10.0.2.2:8000'; // ← PCエミュレータ用
+  final dio = ref.watch(dioProvider);
 
-  final url = Uri.parse('$BASE_URL/api/users/token/');
   try {
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': trimmedEmail, 'password': password}),
-    );
-
-    if (response.statusCode == 200) {
-      final resJson = jsonDecode(response.body);
-      final accessToken = resJson['access'];
-      final refreshToken = resJson['refresh'];
-      print('✅ ログイン成功！アクセストークン: $accessToken');
-      return {
-        'access': accessToken,
-        'refresh': refreshToken,
-      };
-    } else {
-      final resJson = jsonDecode(response.body);
-      throw Exception(resJson.toString());
-    }
-  } catch (e) {
-    print('❌ ログイン通信エラー: $e');
-    throw Exception('ログインに失敗しました: $e');
-  }
-}
-
-
-/// ログインユーザー取得API
-Future<void> fetchCurrentUser(BuildContext context, WidgetRef ref) async {
-  // トークンを取得
-  final token = await getAccessToken();
-
-  // トークンがなければログイン画面へ
-  if (token == null) {
-    Navigator.pushReplacementNamed(context, '/login');
-    return;
-  }
-
-  // ログインユーザー情報を取得
-  final response = await http.get(
-    Uri.parse('http://10.0.2.2:8000/api/users/current/'),
-    headers: {'Authorization': 'Bearer $token'},
-  );
-
-  if (response.statusCode == 200) {
-    // jsonをMapに変換
-    final json = jsonDecode(response.body);
-    // UserModelにMap userを渡しインスタンス化
-    final user = UserModel.fromJson(json['user']);
-
-    // RiverpodのUserProviderにセット
-    ref.read(userProvider.notifier).setUser(user);
-
-    // userが確実に反映されてから遷移（フレーム待つ）
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.pushReplacementNamed(context, '/home');
+    final response = await dio.post('users/token/', data: {
+      'email': email.trim(),
+      'password': password,
     });
 
-  } else if (response.statusCode == 401) {
-
-    print('★ アクセストークン期限切れ → リフレッシュトークンで更新試行');
-    
-    final refreshed = await refreshAccessToken();
-
-    if (refreshed) {
-      // 再取得できたら、もう一回自分自身を呼び出す
-      print('★ アクセストークン更新成功 → fetchCurrentUserをリトライ');
-      await fetchCurrentUser(context, ref);
-
-    } else {
-      // 失敗したらトークン削除してログイン画面へ
-      await deleteTokens();
-      Navigator.pushReplacementNamed(context, '/login');
-    }
-    
-  } else {
-    print('ユーザー取得失敗: ${response.statusCode}');
+    final resJson = response.data;
+    return {
+      'access': resJson['access'],
+      'refresh': resJson['refresh'],
+    };
+  } on DioException catch (e) {
+    throw Exception(e.response?.data.toString() ?? 'ログインに失敗しました');
   }
 }
+
+Future<void> fetchCurrentUser(BuildContext context, WidgetRef ref) async {
+  final dio = ref.watch(dioProvider);
+
+  try {
+    final response = await dio.get('users/current/');
+
+    final userJson = response.data['user'];
+    final user = UserModel.fromJson(userJson);
+    ref.read(userProvider.notifier).setUser(user);
+
+    // ✅ 会社情報あり/なしで分岐
+    if (user.company == null) {
+      // 会社未所属
+      Navigator.pushReplacementNamed(context, '/company/top');
+    } else if (!user.company!.isApproved) {
+      // 申請中（承認待ち）
+      Navigator.pushReplacementNamed(context, '/company/pending');
+    } else {
+      // 承認済み → ホーム画面へ
+      Navigator.pushReplacementNamed(context, '/home');
+    }
+
+  } on DioException catch (e) {
+    if (e.response?.statusCode == 401) {
+      final refreshed = await refreshAccessToken();
+      if (refreshed) {
+        await fetchCurrentUser(context, ref);
+      } else {
+        await deleteTokens();
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    } else {
+      print('ユーザー取得失敗: ${e.response?.statusCode}');
+      Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
+}
+

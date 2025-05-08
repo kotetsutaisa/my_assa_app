@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // ← RiverpodだけでOK
 import 'package:frontend/layout/app_scaffold.dart';
+import 'package:frontend/screens/company_add_page.dart';
+import 'package:frontend/screens/company_create_page.dart';
+import 'package:frontend/screens/company_top_page.dart';
+import 'package:frontend/screens/company_pending_page.dart';
+import 'package:frontend/screens/post_create_page.dart';
 import 'theme/theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_page.dart';
@@ -33,6 +38,11 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/home': (context) => const AppScaffold(),
+        '/company/top': (context) => const CompanyTopPage(),
+        '/company/add': (context) => const CompanyAddPage(),
+        '/company/create': (context) => const CompanyCreatePage(),
+        '/company/pending': (context) => const CompanyPendingPage(),
+        '/post/create': (context) => const PostCreatePage(),
       },
     );
   }

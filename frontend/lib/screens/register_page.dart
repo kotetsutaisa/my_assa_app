@@ -45,114 +45,127 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       ),
 
       // ボディー
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-
-          children: [
-            Text(
-              'アカウント作成',
-              style: Theme.of(context).textTheme.headlineLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 30),
-
-            //　名前
-            Center(
-              child: SizedBox(
-                width: 280,
-                child: TextField(
-                  controller: _nameController,
-                  keyboardType: TextInputType.name,
-                  decoration: InputDecoration(
-                    labelText: '名前',
-                    hintText: 'フルネームで記入してください',
-                  ),
-                ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height - kToolbarHeight - 150, // 中央揃えのため
               ),
-            ),
-            const SizedBox(height: 30),
-
-            // アカウントID
-            Center(
-              child: SizedBox(
-                width: 280,
-                child: TextField(
-                  controller: _accountIdController,
-                  decoration: InputDecoration(labelText: 'アカウントID'),
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // メールアドレス
-            Center(
-              child: SizedBox(
-                width: 280,
-                child: TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autocorrect: false,
-                  decoration: InputDecoration(
-                    labelText: 'メールアドレス',
-                    hintText: 'example@example.com',
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // パスワード
-            Center(
-              child: SizedBox(
-                width: 280,
-                child: TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: InputDecoration(labelText: 'パスワード'),
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // アカウント作成ボタン
-            Center(
-              child: SizedBox(
-                width: 280,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      // 入力されたデータをサーバーに送信する関数を実行
-                      final tokens = await registerUser(
-                        username: _nameController.text.trim(),
-                        accountId: _accountIdController.text.trim(),
-                        email: _emailController.text.trim(),
-                        password: _passwordController.text.trim(),
-                      );
-                      await saveTokens(tokens['access']!, tokens['refresh']!);
-                      await fetchCurrentUser(context, ref);
-                    } catch (e) {
-                      _showError(context, e.toString());
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    backgroundColor: Color.fromRGBO(39, 39, 39, 1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(50),
+              child: IntrinsicHeight(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                
+                  children: [
+                    Text(
+                      'アカウント作成',
+                      style: Theme.of(context).textTheme.headlineLarge,
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-
-                  child: Text(
-                    'アカウント作成',
-                    style: TextStyle(fontSize: 16, color: Colors.white),
-                  ),
+                    const SizedBox(height: 30),
+                
+                    //　名前
+                    Center(
+                      child: SizedBox(
+                        width: 280,
+                        child: TextField(
+                          controller: _nameController,
+                          keyboardType: TextInputType.name,
+                          decoration: InputDecoration(
+                            labelText: '名前',
+                            hintText: 'フルネームで記入してください',
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                
+                    // アカウントID
+                    Center(
+                      child: SizedBox(
+                        width: 280,
+                        child: TextField(
+                          controller: _accountIdController,
+                          decoration: InputDecoration(labelText: 'アカウントID'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                
+                    // メールアドレス
+                    Center(
+                      child: SizedBox(
+                        width: 280,
+                        child: TextField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          autocorrect: false,
+                          decoration: InputDecoration(
+                            labelText: 'メールアドレス',
+                            hintText: 'example@example.com',
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                
+                    // パスワード
+                    Center(
+                      child: SizedBox(
+                        width: 280,
+                        child: TextField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: InputDecoration(labelText: 'パスワード'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                
+                    // アカウント作成ボタン
+                    Center(
+                      child: SizedBox(
+                        width: 280,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            print('🟢 ボタンが押された！');
+                            try {
+                              // 入力されたデータをサーバーに送信する関数を実行
+                              final tokens = await registerUser(
+                                ref: ref,
+                                username: _nameController.text.trim(),
+                                accountId: _accountIdController.text.trim(),
+                                email: _emailController.text.trim(),
+                                password: _passwordController.text.trim(),
+                              );
+                              await saveTokens(tokens['access']!, tokens['refresh']!);
+                              await fetchCurrentUser(context, ref);
+                            } catch (e) {
+                              _showError(context, e.toString());
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            backgroundColor: Color.fromRGBO(39, 39, 39, 1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(50),
+                            ),
+                          ),
+                
+                          child: Text(
+                            'アカウント作成',
+                            style: TextStyle(fontSize: 16, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

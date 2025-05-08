@@ -5,6 +5,7 @@ class PostModel {
   final String createdAt;
   final String userUsername;
   final String userAccountId;
+  final bool isImportant;
   final String? userIconImg;
 
   PostModel({
@@ -14,6 +15,7 @@ class PostModel {
     required this.createdAt,
     required this.userUsername,
     required this.userAccountId,
+    required this.isImportant,
     this.userIconImg,
   });
 
@@ -25,6 +27,7 @@ class PostModel {
       createdAt: json['created_at'],
       userUsername: json['user_username'],
       userAccountId: json['user_account_id'],
+      isImportant: json['is_important'] as bool,
       userIconImg: json['user_iconimg'],
     );
   }

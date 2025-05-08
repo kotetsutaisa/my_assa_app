@@ -6,6 +6,8 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 
+from companies.serializers import CompanyCreateSerializer
+
 User = get_user_model()
 
 # 最小限のユーザー情報を返すシリアライザー
@@ -19,6 +21,7 @@ class SimpleUserSerializer(serializers.ModelSerializer):
 # 全てのユーザー情報を返すシリアライザー
 class FullUserSerializer(serializers.ModelSerializer):
     iconimg = serializers.ImageField(use_url=True)
+    company = CompanyCreateSerializer(read_only=True)
 
     class Meta:
         model = User

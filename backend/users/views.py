@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 
 from .serializers import CustomTokenObtainPairSerializer
 from .serializers import CustomUserCreateSerializer
-from .serializers import SimpleUserSerializer
+from .serializers import FullUserSerializer
 
 User = get_user_model()
 
@@ -53,7 +53,7 @@ class GetCurrentUser(APIView):
     """
     def get(self, request):
         currentUser = request.user
-        serializer = SimpleUserSerializer(currentUser)
+        serializer = FullUserSerializer(currentUser)
         return Response(
             {
                 "message": "ユーザー情報を取得しました。",

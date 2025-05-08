@@ -1,21 +1,43 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/post_model.dart';
 
 // 投稿一覧取得API
-Future<List<PostModel>> fetchPosts() async {
-  final url = Uri.parse('http://10.0.2.2:8000/api/posts/');
-
-  final response = await http.get(url);
-
-  if (response.statusCode == 200) {
-    final decodedBody = utf8.decode(response.bodyBytes);
-
-    final List<dynamic> jsonList = jsonDecode(decodedBody);
-
-    // Map → PostModelに変換
+Future<List<PostModel>> fetchPosts(Dio dio) async {
+  try {
+    final response = await dio.get('posts/');
+    final List<dynamic> jsonList = response.data;
     return jsonList.map((json) => PostModel.fromJson(json)).toList();
-  } else {
+  } on DioException catch (e) {
+    print('投稿一覧取得エラー: ${e.message}');
     throw Exception('投稿の取得に失敗しました');
+  }
+}
+
+
+
+/// --- 新規投稿API（画像付き対応）---
+Future<void> createPost({
+  required Dio dio,
+  required String content,
+  required bool isImportant,
+  XFile? imageFile,
+}) async {
+  try {
+    final formData = FormData.fromMap({
+      'content': content,
+      'is_important': isImportant,
+      if (imageFile != null)
+        'image': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: imageFile.name,
+        ),
+    });
+
+    await dio.post('posts/create/', data: formData);
+  } on DioException catch (e) {
+    print(' 投稿作成エラー: ${e.message}');
+    final msg = e.response?.data['detail'] ?? '投稿の作成に失敗しました';
+    throw Exception(msg);
   }
 }

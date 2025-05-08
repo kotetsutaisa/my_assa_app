@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.contrib.auth import get_user_model
 
 # Django標準のユーザーモデルを取得
@@ -6,14 +7,30 @@ User = get_user_model()
 
 # 投稿モデル
 class Post(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)  # 投稿者（ユーザーとの紐付け）
-    content = models.TextField()  # 投稿本文
-    image = models.ImageField(upload_to='post_images/', null=True, blank=True)  # 画像（任意）
-    views = models.PositiveIntegerField(default=0)  # 閲覧数のカウント
-    created_at = models.DateTimeField(auto_now_add=True)  # 投稿日時（自動保存）
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='posts'
+    )
+    company = models.ForeignKey(            # ★追加
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name='posts',
+        db_index=True                       # フィルタ専用インデックス
+    )
+    content = models.TextField()
+    image = models.ImageField(upload_to='post_images/', null=True, blank=True)
+    views = models.PositiveIntegerField(default=0)
+    is_important = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['company', '-created_at']),
+        ]
 
     def __str__(self):
-        return f"{self.user.username}: {self.content[:20]}"  # 管理画面などで表示するタイトル
+        return f'{self.user.username}: {self.content[:20]}'
 
 
 # いいねモデル
