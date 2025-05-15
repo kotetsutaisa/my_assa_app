@@ -5,11 +5,12 @@ String formatPostDate(String isoDateString) {
   final postDate = DateTime.parse(isoDateString);
   final difference = now.difference(postDate);
 
-  if (difference.inHours < 24) {
+  if (difference.inMinutes < 60) {
+    return '${difference.inMinutes}分前';
+  } else if (difference.inHours < 24) {
     return '${difference.inHours}時間前';
   } else {
-    // 「3月15日」のようにフォーマット
-    final formatter = DateFormat.Md('ja'); // 月日形式（ロケールjaで「3/15」→「3月15日」）
+    final formatter = DateFormat.Md('ja'); // 「3月15日」
     return formatter.format(postDate);
   }
 }

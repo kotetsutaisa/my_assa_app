@@ -8,6 +8,7 @@ class UserModel {
   final String username;
   final String accountId;
   final String? iconimg;
+  final String? bio;
   final Company? company;
 
   // 引数セットと値代入
@@ -18,6 +19,7 @@ class UserModel {
     required this.username,
     required this.accountId,
     this.iconimg,
+    this.bio,
     this.company,
   });
 
@@ -29,10 +31,20 @@ class UserModel {
       email: json['email'],
       username: json['username'],
       accountId: json['account_id'],
+      bio: json['bio'] ?? '',
       iconimg: json['iconimg'],
-      company: json['company'] != null
-        ? Company.fromJson(json['company'])
-        : null,
+      company: json['company'] != null ? Company.fromJson(json['company']) : null,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'username': username,
+      'account_id': accountId,
+      'email': email,
+      'iconimg': iconimg,
+      'bio': bio,
+    };
   }
 }

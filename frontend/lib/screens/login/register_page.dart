@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:frontend/api/company_api.dart';
-import 'package:frontend/exceptions/api_exception.dart';
-import 'package:frontend/providers/company_provider.dart';
+import '../../api/user_api.dart';
+import '../../utils/token_manager.dart';
 
-class CompanyCreatePage extends ConsumerStatefulWidget {
-  const CompanyCreatePage({super.key});
+class RegisterPage extends ConsumerStatefulWidget {
+  const RegisterPage({super.key});
 
   @override
-  ConsumerState<CompanyCreatePage> createState() => _CompanyCreatePage();
+  ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _CompanyCreatePage extends ConsumerState<CompanyCreatePage> {
+class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _nameController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _accountIdController = TextEditingController(text: '@');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
-    _addressController.dispose();
-    _phoneController.dispose();
+    _accountIdController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -38,10 +39,12 @@ class _CompanyCreatePage extends ConsumerState<CompanyCreatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // ヘッダー
       appBar: AppBar(
         title: Text('Fj', style: Theme.of(context).textTheme.headlineLarge),
       ),
 
+      // ボディー
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -54,78 +57,95 @@ class _CompanyCreatePage extends ConsumerState<CompanyCreatePage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-            
+                
                   children: [
                     Text(
-                      '会社グループを作成',
+                      'アカウント作成',
                       style: Theme.of(context).textTheme.headlineLarge,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 30),
-            
+                
+                    //　名前
                     Center(
                       child: SizedBox(
                         width: 280,
                         child: TextField(
                           controller: _nameController,
                           keyboardType: TextInputType.name,
-                          decoration: InputDecoration(labelText: '会社名'),
+                          decoration: InputDecoration(
+                            labelText: '名前',
+                            hintText: 'フルネームで記入してください',
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 30),
-            
+                
+                    // アカウントID
                     Center(
                       child: SizedBox(
                         width: 280,
                         child: TextField(
-                          controller: _addressController,
-                          keyboardType: TextInputType.name,
-                          decoration: InputDecoration(labelText: '会社の住所'),
+                          controller: _accountIdController,
+                          decoration: InputDecoration(labelText: 'アカウントID'),
                         ),
                       ),
                     ),
                     const SizedBox(height: 30),
-            
+                
+                    // メールアドレス
                     Center(
                       child: SizedBox(
                         width: 280,
                         child: TextField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          decoration: InputDecoration(labelText: '会社の電話番号'),
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          autocorrect: false,
+                          decoration: InputDecoration(
+                            labelText: 'メールアドレス',
+                            hintText: 'example@example.com',
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 30),
-            
+                
+                    // パスワード
+                    Center(
+                      child: SizedBox(
+                        width: 280,
+                        child: TextField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: InputDecoration(labelText: 'パスワード'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                
+                    // アカウント作成ボタン
                     Center(
                       child: SizedBox(
                         width: 280,
                         child: ElevatedButton(
                           onPressed: () async {
+                            print('🟢 ボタンが押された！');
                             try {
-                              final company = await registerCompany(
+                              // 入力されたデータをサーバーに送信する関数を実行
+                              final tokens = await registerUser(
                                 ref: ref,
-                                companyName: _nameController.text.trim(),
-                                companyAddress: _addressController.text.trim(),
-                                companyPhone: _phoneController.text.trim(),
+                                username: _nameController.text.trim(),
+                                accountId: _accountIdController.text.trim(),
+                                email: _emailController.text.trim(),
+                                password: _passwordController.text.trim(),
                               );
-            
-                              // Riverpodで状態を更新
-                              ref.read(companyProvider.notifier).state = company;
-            
-                              // 遷移 or 成功ダイアログなど
-                              Navigator.pushReplacementNamed(context, '/home');
-                            } on ApiException catch (e) {
-                              _showError(context, e.message);
-            
-                              if (e.statusCode == 401) {
-                                Navigator.pushReplacementNamed(context, '/login');
-                              }
+                              await saveTokens(tokens['access']!, tokens['refresh']!);
+                              await fetchCurrentUser(context, ref);
+                            } catch (e) {
+                              _showError(context, e.toString());
                             }
                           },
-            
                           style: ElevatedButton.styleFrom(
                             padding: EdgeInsets.symmetric(vertical: 12),
                             backgroundColor: Color.fromRGBO(39, 39, 39, 1),
@@ -133,9 +153,9 @@ class _CompanyCreatePage extends ConsumerState<CompanyCreatePage> {
                               borderRadius: BorderRadius.circular(50),
                             ),
                           ),
-            
+                
                           child: Text(
-                            '会社グループ作成の申請',
+                            'アカウント作成',
                             style: TextStyle(fontSize: 16, color: Colors.white),
                           ),
                         ),

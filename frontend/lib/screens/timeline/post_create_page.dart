@@ -1,14 +1,15 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/utils/constants.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../api/post_api.dart';
-import '../models/post_model.dart';
-import '../providers/dio_provider.dart';
-import '../providers/post_list_provider.dart';
-import '../providers/user_provider.dart';
+import '../../api/post_api.dart';
+import '../../providers/dio_provider.dart';
+import '../../providers/post_list_provider.dart';
+import '../../providers/user_provider.dart';
 
 class PostCreatePage extends ConsumerStatefulWidget {
   const PostCreatePage({super.key});
@@ -20,7 +21,9 @@ class PostCreatePage extends ConsumerStatefulWidget {
 class _PostCreatePageState extends ConsumerState<PostCreatePage> {
   final _contentController = TextEditingController();
   final _focusNode = FocusNode();
-  XFile? _imageFile;
+
+  final List<XFile> _imageFiles = [];
+
   bool _isLoading = false;
   bool _isImportant = false; // 重要フラグ
 
@@ -56,21 +59,15 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
       await createPost(
         dio: dio,
         content: content,
-        isImportant: _isImportant,      // ★ 送信
-        imageFile: _imageFile,
+        isImportant: _isImportant,
+        imageFiles: _imageFiles,
       );
 
-      final newPost = PostModel(
-        id: 0,
-        content: content,
-        image: null,
-        createdAt: DateTime.now().toIso8601String(),
-        userUsername: user.username,
-        userAccountId: user.accountId,
-        userIconImg: user.iconimg,
-        isImportant: _isImportant,      // ★ クライアントキャッシュも反映
-      );
-      ref.read(postListProvider.notifier).addPost(newPost);
+      // 🔽 投稿後、画像付きの最新投稿を取得して Provider に追加
+      final posts = await fetchPosts(dio);
+      final latestPost = posts.first;
+      ref.read(postListProvider.notifier).addPost(latestPost);
+
       if (mounted) Navigator.of(context).pop();
     } catch (e, st) {
       debugPrintStack(stackTrace: st, label: e.toString());
@@ -80,10 +77,33 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
     }
   }
 
-  Future<void> _pickImage() async {
+  String resolveImageUrl(String path) {
+    if (path.startsWith('http')) return path;
+    final base = apiBaseUrl.replaceFirst(RegExp(r'/api/?$'), '');
+    return '$base$path';
+  }
+
+    /* ───────── 画像選択 (4 枚まで追加) ───────── */
+  Future<void> _pickImages() async {
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) setState(() => _imageFile = image);
+    final remain = 4 - _imageFiles.length;
+    if (remain <= 0) return;
+
+    final picked = await picker.pickMultiImage(imageQuality: 85);
+    if (!mounted) return;
+
+    if (picked.isNotEmpty) {
+      setState(() {
+        _imageFiles.addAll(
+          picked.take(remain), // 上限 4 枚を厳守
+        );
+      });
+    }
+
+    // picker から戻った後にフォーカスを復帰
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted) _focusNode.requestFocus();
+    });
   }
 
   void _showError(String message) {
@@ -138,7 +158,7 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
                           padding: const EdgeInsets.all(8.0),
                           child: CircleAvatar(
                             radius: 25,
-                            backgroundImage: NetworkImage('http://10.0.2.2:8000${user!.iconimg}'),
+                            backgroundImage: CachedNetworkImageProvider(resolveImageUrl(user!.iconimg!)),
                             backgroundColor: Colors.grey[200],
                           ),
                         )
@@ -165,15 +185,54 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  if (_imageFile != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(File(_imageFile!.path), height: 150),
+                  
+                  /* ★ プレビュー：Wrap で複数表示 */
+                  if (_imageFiles.isNotEmpty)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: List.generate(_imageFiles.length, (i) {
+                        final file = _imageFiles[i];
+                        return Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                File(file.path),
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 2,
+                              right: 2,
+                              child: InkWell(
+                                onTap: () =>
+                                    setState(() => _imageFiles.removeAt(i)),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.all(2),
+                                  child: const Icon(Icons.close,
+                                      size: 16, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
                     ),
+
+                      
                   const Spacer(),
                 ],
               ),
             ),
+
+            // ====== フッター操作行 ======
             if (isKeyboardOpen)
               Positioned(
                 bottom: bottomInset,
@@ -183,9 +242,13 @@ class _PostCreatePageState extends ConsumerState<PostCreatePage> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _pickImage,
+                        onPressed: _pickImages,
                         icon: const Icon(Icons.image),
-                        label: const Text('画像を選択'),
+                        label: Text(
+                          _imageFiles.isEmpty
+                            ? '画像を選択'
+                            : '追加 (${_imageFiles.length}/4)',
+                        ),
                         style: ElevatedButton.styleFrom(
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),

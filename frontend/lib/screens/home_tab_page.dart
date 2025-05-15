@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/providers/current_page_provider.dart';
-import 'package:frontend/screens/company_page.dart';
+import 'package:frontend/screens/company/company_page.dart';
 import 'package:frontend/screens/invitation_page.dart';
 import 'package:frontend/screens/new_work_page.dart';
 import 'package:frontend/screens/track_page.dart';
+import 'package:frontend/utils/constants.dart';
 import 'package:frontend/widgets/column_button.dart';
 import '../providers/user_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/sub_header.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HomeTabPage extends ConsumerStatefulWidget {
   const HomeTabPage({super.key});
@@ -18,6 +20,14 @@ class HomeTabPage extends ConsumerStatefulWidget {
 }
 
 class _HomeTabPageState extends ConsumerState<HomeTabPage> {
+
+  String resolveImageUrl(String path) {
+    if (path.startsWith('http')) return path;
+    final base = apiBaseUrl.replaceFirst(RegExp(r'/api/?$'), '');
+    return '$base$path';
+  }
+  
+
   @override
   Widget build(BuildContext context) {
     // ログインユーザー情報を取得
@@ -53,8 +63,10 @@ class _HomeTabPageState extends ConsumerState<HomeTabPage> {
                       padding: const EdgeInsets.all(8.0),
                       child: CircleAvatar(
                         radius: 25,
-                        backgroundImage: NetworkImage(
-                          'http://10.0.2.2:8000${user!.iconimg}',
+                        backgroundImage: CachedNetworkImageProvider(
+                          user!.iconimg!.startsWith('http')
+                              ? user.iconimg!
+                              : resolveImageUrl(user.iconimg!),
                         ),
                         backgroundColor: Colors.grey[200],
                       ),
@@ -62,7 +74,7 @@ class _HomeTabPageState extends ConsumerState<HomeTabPage> {
                   else
                     CircleAvatar(
                       radius: 15,
-                      backgroundColor: Theme.of(context).primaryColor,
+                      backgroundColor: Theme.of(context).colorScheme.secondary,
                       child: Icon(Icons.person, color: Colors.white),
                     ),
                   const SizedBox(width: 20),

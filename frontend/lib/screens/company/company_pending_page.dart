@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../utils/token_manager.dart';
+import '../../utils/token_manager.dart';
 
 class CompanyPendingPage extends ConsumerWidget {
   const CompanyPendingPage({super.key});
@@ -16,7 +16,7 @@ class CompanyPendingPage extends ConsumerWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.pop(context); // ← 戻る
+            Navigator.pushReplacementNamed(context, '/login');
           },
         ),
         actions: [

@@ -1,6 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:frontend/utils/constants.dart';
 import 'package:frontend/utils/token_manager.dart';
 
 // プロバイダー
@@ -14,6 +16,13 @@ class CommonDrawer extends ConsumerStatefulWidget {
 }
 
 class _CommonDrawerState extends ConsumerState<CommonDrawer> {
+
+  String resolveImageUrl(String path) {
+    if (path.startsWith('http')) return path;
+    final base = apiBaseUrl.replaceFirst(RegExp(r'/api/?$'), '');
+    return '$base$path';
+  }
+
   @override
   Widget build(BuildContext context) {
     // ログインユーザー情報を取得
@@ -39,7 +48,11 @@ class _CommonDrawerState extends ConsumerState<CommonDrawer> {
                     CircleAvatar(
                       radius: 20,
                       backgroundImage: user?.iconimg != null
-                          ? NetworkImage('http://10.0.2.2:8000${user!.iconimg}')
+                          ? CachedNetworkImageProvider(
+                              user!.iconimg!.startsWith('http')
+                                  ? user.iconimg!
+                                  : resolveImageUrl(user.iconimg!),
+                            )
                           : null,
                       backgroundColor: const Color.fromARGB(255, 45, 45, 45),
                       child: user?.iconimg == null

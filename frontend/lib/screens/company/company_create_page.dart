@@ -1,27 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../api/user_api.dart';
-import '../utils/token_manager.dart';
+import 'package:frontend/api/company_api.dart';
+import 'package:frontend/exceptions/api_exception.dart';
+import 'package:frontend/providers/company_provider.dart';
 
-class RegisterPage extends ConsumerStatefulWidget {
-  const RegisterPage({super.key});
+class CompanyCreatePage extends ConsumerStatefulWidget {
+  const CompanyCreatePage({super.key});
 
   @override
-  ConsumerState<RegisterPage> createState() => _RegisterPageState();
+  ConsumerState<CompanyCreatePage> createState() => _CompanyCreatePage();
 }
 
-class _RegisterPageState extends ConsumerState<RegisterPage> {
+class _CompanyCreatePage extends ConsumerState<CompanyCreatePage> {
   final _nameController = TextEditingController();
-  final _accountIdController = TextEditingController(text: '@');
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
-    _accountIdController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -39,12 +38,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ヘッダー
       appBar: AppBar(
         title: Text('Fj', style: Theme.of(context).textTheme.headlineLarge),
       ),
 
-      // ボディー
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -57,95 +54,82 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                
+            
                   children: [
                     Text(
-                      'アカウント作成',
+                      '会社グループを作成',
                       style: Theme.of(context).textTheme.headlineLarge,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 30),
-                
-                    //　名前
+            
                     Center(
                       child: SizedBox(
                         width: 280,
                         child: TextField(
                           controller: _nameController,
                           keyboardType: TextInputType.name,
-                          decoration: InputDecoration(
-                            labelText: '名前',
-                            hintText: 'フルネームで記入してください',
-                          ),
+                          decoration: InputDecoration(labelText: '会社名'),
                         ),
                       ),
                     ),
                     const SizedBox(height: 30),
-                
-                    // アカウントID
+            
                     Center(
                       child: SizedBox(
                         width: 280,
                         child: TextField(
-                          controller: _accountIdController,
-                          decoration: InputDecoration(labelText: 'アカウントID'),
+                          controller: _addressController,
+                          keyboardType: TextInputType.name,
+                          decoration: InputDecoration(labelText: '会社の住所'),
                         ),
                       ),
                     ),
                     const SizedBox(height: 30),
-                
-                    // メールアドレス
+            
                     Center(
                       child: SizedBox(
                         width: 280,
                         child: TextField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          autocorrect: false,
-                          decoration: InputDecoration(
-                            labelText: 'メールアドレス',
-                            hintText: 'example@example.com',
-                          ),
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          decoration: InputDecoration(labelText: '会社の電話番号'),
                         ),
                       ),
                     ),
                     const SizedBox(height: 30),
-                
-                    // パスワード
-                    Center(
-                      child: SizedBox(
-                        width: 280,
-                        child: TextField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          decoration: InputDecoration(labelText: 'パスワード'),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                
-                    // アカウント作成ボタン
+            
                     Center(
                       child: SizedBox(
                         width: 280,
                         child: ElevatedButton(
                           onPressed: () async {
-                            print('🟢 ボタンが押された！');
                             try {
-                              // 入力されたデータをサーバーに送信する関数を実行
-                              final tokens = await registerUser(
+                              final company = await registerCompany(
                                 ref: ref,
-                                username: _nameController.text.trim(),
-                                accountId: _accountIdController.text.trim(),
-                                email: _emailController.text.trim(),
-                                password: _passwordController.text.trim(),
+                                companyName: _nameController.text.trim(),
+                                companyAddress: _addressController.text.trim(),
+                                companyPhone: _phoneController.text.trim(),
                               );
-                              await saveTokens(tokens['access']!, tokens['refresh']!);
-                              await fetchCurrentUser(context, ref);
-                            } catch (e) {
-                              _showError(context, e.toString());
+            
+                              // Riverpodで状態を更新
+                              ref.read(companyProvider.notifier).state = company;
+            
+                              // is_approved を確認して遷移先を変える
+                              if (company.isApproved == false) {
+                                Navigator.pushReplacementNamed(context, '/company/pending');
+                              } else {
+                                Navigator.pushReplacementNamed(context, '/home');
+                              }
+                            } on ApiException catch (e) {
+                              _showError(context, e.message);
+            
+                              if (e.statusCode == 401) {
+                                Navigator.pushReplacementNamed(context, '/login');
+                              }
                             }
                           },
+            
                           style: ElevatedButton.styleFrom(
                             padding: EdgeInsets.symmetric(vertical: 12),
                             backgroundColor: Color.fromRGBO(39, 39, 39, 1),
@@ -153,9 +137,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                               borderRadius: BorderRadius.circular(50),
                             ),
                           ),
-                
+            
                           child: Text(
-                            'アカウント作成',
+                            '会社グループ作成の申請',
                             style: TextStyle(fontSize: 16, color: Colors.white),
                           ),
                         ),

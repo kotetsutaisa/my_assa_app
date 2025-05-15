@@ -1,71 +1,96 @@
-from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework import generics
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.permissions import AllowAny
-from rest_framework_simplejwt.views import TokenRefreshView
+# users/views.py
+from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.db import transaction
+from rest_framework import generics, status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.views import APIView
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
-from .serializers import CustomTokenObtainPairSerializer
-from .serializers import CustomUserCreateSerializer
-from .serializers import FullUserSerializer
+from .serializers import (
+    CustomTokenObtainPairSerializer,
+    CustomUserCreateSerializer,
+    FullUserSerializer, UserUpdateSerializer
+)
 
 User = get_user_model()
 
-# ----------------------------
-# JWTログインAPI
-# メールアドレスとパスワードを受け取り、JWTトークン（access + refresh）を返す
-# ----------------------------
+# --------------------------------------------------
+# 1. 共通: レート制限クラス
+# --------------------------------------------------
+class BurstRateThrottle(UserRateThrottle):   # 短期スパイク
+    rate = "20/min"
+
+class SustainedRateThrottle(UserRateThrottle):  # 1 日あたり
+    rate = "2000/day"
+
+
+# --------------------------------------------------
+# 2. 認証トークン取得
+# --------------------------------------------------
 class CustomTokenObtainPairView(TokenObtainPairView):
     permission_classes = [AllowAny]
-    serializer_class = CustomTokenObtainPairSerializer      # 独自のシリアライザーでログイン処理を拡張
+    serializer_class = CustomTokenObtainPairSerializer
+    throttle_classes = [BurstRateThrottle, SustainedRateThrottle]
 
 
-# ----------------------------
-# ユーザー登録API
-# 登録と同時にJWTトークンを発行し、ログイン状態にできるようにする
-# ※ CreateAPIViewを使っていないのは、serializer.save() が辞書を返すため
-# ----------------------------
-class UserRegisterView(APIView):
+# --------------------------------------------------
+# 3. ユーザー登録
+#    - GenericAPIView で拡張性確保
+#    - serializer.save() が dict を返す前提で create を override
+# --------------------------------------------------
+class UserRegisterView(generics.GenericAPIView):
     permission_classes = [AllowAny]
+    serializer_class = CustomUserCreateSerializer
+    throttle_classes = [BurstRateThrottle, SustainedRateThrottle]
 
-    def post(self, request):
-        serializer = CustomUserCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            data = serializer.save()  # user情報 + トークン（辞書形式）
-            return Response(data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        """
+        新規登録 & JWT 発行
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.save()          # <- dict が返る
+        return Response(data, status=status.HTTP_201_CREATED)
 
-# ----------------------------
-# 最小限のCurrentUserの取得
-# シリアライザーはSimpleUserSerializer
-# ----------------------------
-class GetCurrentUser(APIView):
+
+# --------------------------------------------------
+# 4. 現在ユーザー取得
+#    - RetrieveAPIView を使うと将来 company 絞り込みも楽
+# --------------------------------------------------
+class GetCurrentUser(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [BurstRateThrottle]
+    serializer_class = FullUserSerializer
 
-    """
-    現在ログイン中のユーザー情報を取得するエンドポイント。
-    JWTトークンが有効であれば、ユーザー情報を返す。
-    """
-    def get(self, request):
-        currentUser = request.user
-        serializer = FullUserSerializer(currentUser)
-        return Response(
-            {
-                "message": "ユーザー情報を取得しました。",
-                "user": serializer.data
-            },
-            status=status.HTTP_200_OK
-        )
-    
+    def get_object(self):
+        return self.request.user  # queryset 不要
 
 
+# --------------------------------------------------
+# 5. リフレッシュトークン
+# --------------------------------------------------
 class CustomTokenRefreshView(TokenRefreshView):
-    """
-    リフレッシュ用のカスタムビュー（必要なら独自Serializerも使う）
-    """
-    pass
+    throttle_classes = [BurstRateThrottle]
+
+
+# --------------------------------------------------
+# 6. プロフィール編集
+# --------------------------------------------------
+
+class UpdateCurrentUser(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserUpdateSerializer
+    parser_classes = [MultiPartParser, FormParser] 
+
+    def get_object(self):
+        return self.request.user
+

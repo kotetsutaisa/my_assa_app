@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../api/user_api.dart';
-import '../utils/token_manager.dart';
+import '../../api/user_api.dart';
+import '../../utils/token_manager.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -223,36 +223,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                       ),
                                   ),
                               ),
-                              SizedBox(height: 30),
-                  
-                              Center(
-                                  child: SizedBox(
-                                      width: 280,
-                                      child: ElevatedButton(
-                                          onPressed: () {
-                                              Navigator.pushNamed(context, '/company/top');
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                              padding: EdgeInsets.symmetric(vertical: 12),
-                                              backgroundColor: Color.fromRGBO(39, 39, 39, 1),
-                                              shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(50),
-                                              ),
-                                          ),
-                                          child: Text(
-                                              '会社テスト',
-                                              style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.white,
-                                              ),
-                                          ),
-                                      ),
-                                  ),
-                              ),
-                  
-                  
                           ],
-                        
                       ),
                     ),
                   ),

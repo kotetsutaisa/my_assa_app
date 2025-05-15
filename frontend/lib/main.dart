@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // ← RiverpodだけでOK
 import 'package:frontend/layout/app_scaffold.dart';
-import 'package:frontend/screens/company_add_page.dart';
-import 'package:frontend/screens/company_create_page.dart';
-import 'package:frontend/screens/company_top_page.dart';
-import 'package:frontend/screens/company_pending_page.dart';
-import 'package:frontend/screens/post_create_page.dart';
+import 'package:frontend/screens/company/company_add_page.dart';
+import 'package:frontend/screens/company/company_create_page.dart';
+import 'package:frontend/screens/company/company_top_page.dart';
+import 'package:frontend/screens/company/company_pending_page.dart';
+import 'package:frontend/screens/timeline/post_create_page.dart';
 import 'theme/theme.dart';
 import 'screens/splash_screen.dart';
-import 'screens/login_page.dart';
-import 'screens/register_page.dart';
+import 'screens/login/login_page.dart';
+import 'screens/login/register_page.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {

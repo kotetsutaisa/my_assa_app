@@ -33,3 +33,17 @@ class IsCompanyAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
         user = request.user
         return user.is_authenticated and user.role == Role.ADMIN
+    
+
+class IsCommentAuthorOrCompanyAdmin(permissions.BasePermission):
+    """
+    更新・削除はコメント作者 または 会社 admin/manager のみ許可
+    """
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:          # GET, HEAD, OPTIONS
+            return True
+        user = request.user
+        return (
+            obj.user_id == user.id or
+            user.role in [Role.ADMIN, Role.MANAGER]
+        )

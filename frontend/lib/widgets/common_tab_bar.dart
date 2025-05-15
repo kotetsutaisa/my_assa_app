@@ -1,20 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:frontend/utils/constants.dart';
 
 // プロバイダー
 import '../providers/current_page_provider.dart';
 
 // タブページ
 import '../screens/home_tab_page.dart';
-import '../screens/timeline_tab_page.dart';
+import '../screens/timeline/timeline_tab_page.dart';
 import '../screens/worksite_tab_page.dart';
 import '../screens/schedule_tab_page.dart';
 import '../screens/chat_tab_page.dart';
-import '../screens/profile_tab_page.dart';
+import '../screens/profile/profile_tab_page.dart';
 
 class CustomTabBar extends ConsumerWidget {
   const CustomTabBar({super.key});
+
+  String resolveImageUrl(String path) {
+    if (path.startsWith('http')) return path;
+    final base = apiBaseUrl.replaceFirst(RegExp(r'/api/?$'), '');
+    return '$base$path';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

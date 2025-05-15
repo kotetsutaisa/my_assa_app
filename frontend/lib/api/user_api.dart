@@ -15,6 +15,7 @@ Future<Map<String, String>> registerUser({
   required String accountId, // ユーザーのアカウントID（@xxxx形式）
   required String email, // メールアドレス（ログイン用）
   required String password, // パスワード
+  
 }) async {
   // --- フロント側バリデーション ---
   final trimmedName = username.trim();
@@ -106,7 +107,7 @@ Future<void> fetchCurrentUser(BuildContext context, WidgetRef ref) async {
   try {
     final response = await dio.get('users/current/');
 
-    final userJson = response.data['user'];
+    final userJson = response.data;
     final user = UserModel.fromJson(userJson);
     ref.read(userProvider.notifier).setUser(user);
 

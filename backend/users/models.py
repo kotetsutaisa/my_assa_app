@@ -2,7 +2,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from companies.models import Company
 from django.utils.translation import gettext_lazy as _
-
+from django.contrib.auth.base_user import BaseUserManager
 
 # ユーザーの役職を表す列挙型
 class Role(models.TextChoices):
@@ -15,8 +15,8 @@ class Role(models.TextChoices):
 
 # カスタムJWTユーザーテーブル
 class CustomUser(AbstractUser):
-    # ログイン時の内部ユニーク識別子
-    username = models.CharField(max_length=50, unique=True, blank=False)
+
+    username = models.CharField(max_length=50, unique=False, blank=False)
 
     # ユーザーが自由に設定できるID（@account_id用）
     account_id = models.CharField(max_length=30, unique=True, blank=False)
@@ -50,3 +50,25 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return self.email
 
+
+class CustomUserManager(BaseUserManager):
+    use_in_migrations = True
+
+    def _create_user(self, email, password, **extra_fields):
+        if not email:
+            raise ValueError("メールアドレスは必須です")
+        email = self.normalize_email(email).lower()
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_user(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_superuser", False)
+        return self._create_user(email, password, **extra_fields)
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_staff", True)
+        return self._create_user(email, password, **extra_fields)
+    

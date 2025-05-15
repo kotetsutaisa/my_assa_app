@@ -19,6 +19,23 @@ class PostListNotifier extends AsyncNotifier<List<PostModel>> {
   void addPost(PostModel post) {
     state = AsyncData([post, ...state.value ?? []]);
   }
+
+  void updatePost(PostModel updatedPost) {
+    final current = state.value ?? [];
+    state = AsyncData(
+      current.map((p) => p.id == updatedPost.id ? updatedPost : p).toList(),
+    );
+  }
+
+  void incrementCommentCount(int postId) {
+    final current = state.value ?? [];
+    state = AsyncData(
+      current.map((p) =>
+          p.id == postId ? p.copyWith(commentsCount: p.commentsCount + 1) : p
+      ).toList(),
+    );
+  }
+
 }
 
 // --- Provider登録 ---
