@@ -2,7 +2,7 @@ from django.urls import path
 from .views import CustomTokenObtainPairView
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import CustomTokenObtainPairView, UserRegisterView
-from .views import GetCurrentUser, CustomTokenRefreshView, UpdateCurrentUser
+from .views import GetCurrentUser, CustomTokenRefreshView, UpdateCurrentUser, ConpanyUserAPIView
 
 urlpatterns = [
     path('token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
@@ -10,4 +10,5 @@ urlpatterns = [
     path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
     path('current/', GetCurrentUser.as_view(), name='get-current-user'),
     path('current/update/', UpdateCurrentUser.as_view(), name='update-current-user'),
+    path('company-users/', ConpanyUserAPIView.as_view(), name='company-user-list'),
 ]

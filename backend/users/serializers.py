@@ -195,3 +195,4 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         instance.iconimg = validated_data.get('iconimg', instance.iconimg)
         instance.save()
         return instance
+

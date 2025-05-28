@@ -8,7 +8,7 @@ from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
-from rest_framework.views import APIView
+from rest_framework.serializers import ValidationError
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -17,8 +17,10 @@ from rest_framework_simplejwt.views import (
 from .serializers import (
     CustomTokenObtainPairSerializer,
     CustomUserCreateSerializer,
-    FullUserSerializer, UserUpdateSerializer
+    FullUserSerializer, UserUpdateSerializer,
+    SimpleUserSerializer,
 )
+from .permissions import IsCompanyMember
 
 User = get_user_model()
 
@@ -93,4 +95,21 @@ class UpdateCurrentUser(generics.UpdateAPIView):
 
     def get_object(self):
         return self.request.user
+    
 
+# --------------------------------------------------
+# 7. 同じ会社のユーザーを全て取得
+# --------------------------------------------------
+
+class ConpanyUserAPIView(generics.ListAPIView):
+    serializer_class = SimpleUserSerializer
+    permission_classes = [IsCompanyMember,]
+
+    def get_queryset(self):
+        user = self.request.user
+        return (
+            User.objects
+                .filter(company=user.company, is_active=True)
+                .exclude(id=user.id)
+                .select_related('company')
+        )

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/screens/chat/message_page.dart';
 
 // 共通パーツを読み込む
 import '../widgets/common_header.dart';
@@ -17,8 +18,15 @@ class AppScaffold extends ConsumerWidget {
     // 現在表示するページ（Widget）を取得
     final currentPage = ref.watch(currentPageProvider);
 
+    PreferredSizeWidget? appBar;
+    if (currentPage is MessagePage) {
+      appBar = null;
+    } else {
+      appBar = const CommonHeader();
+    }
+
     return Scaffold(
-      appBar: const CommonHeader(),
+      appBar: appBar,
       drawer: const CommonDrawer(),
       body: currentPage,
       bottomNavigationBar: const CustomTabBar(),

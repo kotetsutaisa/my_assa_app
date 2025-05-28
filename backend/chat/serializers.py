@@ -1,0 +1,132 @@
+from rest_framework import serializers
+from .models import Conversation, Participant, Message, MessageRead
+from users.serializers import SimpleUserSerializer
+
+class ConversationSerializer(serializers.ModelSerializer):
+    icon = serializers.ImageField(required=False, allow_null=True)
+    partner_user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Conversation
+        fields = ('id', 'company', 'title', 'is_group', 'icon','created_at', 'updated_at', 'partner_user',)
+        read_only_fields = ('id', 'company', 'created_at', 'updated_at')
+
+    # ----------------- バリデーション -----------------
+
+    def validate(self, data):
+        # グループならtitle必須、DMならtitleは無視してOK
+        is_group = data.get(
+            "is_group",
+            self.instance.is_group if self.instance else False
+        )
+
+        title = data.get("title") or (self.instance.title if self.instance else None)
+
+        if is_group and not title:
+            raise serializers.ValidationError({"title": "グループチャットではタイトルを入力してください"})
+
+        return data
+
+
+    def validate_title(self, value):
+        if value and len(value) > 50:
+            raise serializers.ValidationError("タイトルは50文字以内で入力してください")
+        return value
+
+    # ----------------- create / update -----------------
+
+    def create(self, validated_data):
+
+        request = self.context["request"]
+        validated_data["company"] = request.user.company
+
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if not instance.is_group and validated_data.get("is_group", False):
+            raise serializers.ValidationError("DM をグループチャットに変更することはできません。")
+
+        return super().update(instance, validated_data)
+    
+    def get_partner_user(self, obj):
+        is_group = obj.get('is_group') if isinstance(obj, dict) else obj.is_group
+        # グループなら相手ユーザーは不要
+        if is_group:
+            return None
+        
+        request = self.context.get('request')
+        me = request.user if request else None
+
+        if isinstance(obj, dict):
+            return None
+
+        # 自分以外の参加者を取得
+        partner = obj.participants.exclude(user=me).first()
+        if partner:
+            return SimpleUserSerializer(partner.user, context=self.context).data
+        return None
+    
+
+
+class ParticipantSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Participant
+        fields = ('user', 'conversation', 'role')
+
+    def validate(self, data):
+
+        user = data["user"]
+        conversation = data["conversation"]
+        
+        # 同じユーザーがすでに参加していないか
+        if Participant.objects.filter(user=user, conversation=conversation, left_at__isnull=True).exists():
+            raise serializers.ValidationError({"user": "このチャットにすでに参加しています"})
+
+        # 会社とユーザーの会社が一致しているか
+        if user.company != conversation.company:
+            raise serializers.ValidationError({"user": "会社が一致していません"})
+        
+        # DMの場合は2人まで
+        member_count = Participant.objects.filter(conversation=conversation, left_at__isnull=True).count()
+        if not conversation.is_group and member_count >= 2:
+            raise serializers.ValidationError({"conversation": "DMには2人しか参加できません"})
+    
+        return data
+    
+
+class MessageSerializer(serializers.ModelSerializer):
+
+    sender = SimpleUserSerializer(read_only=True)
+
+    class Meta:
+        model = Message
+        fields = ('id', 'conversation', 'sender', 'kind', 'body', 'created_at')
+        read_only_fields = ('id', 'sender', 'created_at')
+
+    def create(self, validated_data):
+        request = self.context['request']
+        conversation_id = self.context.get('conversation_id')
+
+        if not conversation_id:
+            raise serializers.ValidationError({"conversation": "conversation_id が context にありません"})
+        
+        try:
+            conversation = Conversation.objects.get(id=conversation_id)
+        except Conversation.DoesNotExist:
+            raise serializers.ValidationError({"conversation": "指定された会話が存在しません"})
+
+        validated_data['conversation'] = conversation
+        validated_data["sender"] = request.user
+
+        return super().create(validated_data)
+    
+
+
+class MessageReadSirializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = MessageRead
+        fields = ('message', 'user', 'read_at')
+        read_only_fields = ('message', 'user', 'read_at',)
+        

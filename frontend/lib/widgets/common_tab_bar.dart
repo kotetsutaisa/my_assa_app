@@ -11,7 +11,7 @@ import '../screens/home_tab_page.dart';
 import '../screens/timeline/timeline_tab_page.dart';
 import '../screens/worksite_tab_page.dart';
 import '../screens/schedule_tab_page.dart';
-import '../screens/chat_tab_page.dart';
+import '../screens/chat/chat_list_page.dart';
 import '../screens/profile/profile_tab_page.dart';
 
 class CustomTabBar extends ConsumerWidget {
@@ -66,7 +66,7 @@ class CustomTabBar extends ConsumerWidget {
     if (currentPage is TimelineTabPage) return 1;
     if (currentPage is WorksiteTabPage) return 2;
     if (currentPage is ScheduleTabPage) return 3;
-    if (currentPage is ChatTabPage) return 4;
+    if (currentPage is ChatListPage) return 4;
     if (currentPage is ProfileTabPage) return 5;
     return 0; // デフォルト
   }
@@ -83,7 +83,7 @@ class CustomTabBar extends ConsumerWidget {
       case 3:
         return const ScheduleTabPage();
       case 4:
-        return const ChatTabPage();
+        return const ChatListPage();
       case 5:
         return const ProfileTabPage();
       default:
