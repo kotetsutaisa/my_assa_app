@@ -44,6 +44,19 @@ Future<void> _connectWebSocket() async {
     print('📥 WebSocketメッセージ受信: $event');
 
     final data = jsonDecode(event);
+
+    // --- 既読通知の処理を追加 ---
+    if (data['type'] == 'read') {
+      final messageId = data['message_id'];
+
+      ref
+        .read(messageListProvider(widget.conversation.id).notifier)
+        .markMessageAsRead(messageId);
+
+      return;
+    }
+
+    // --- 通常の新着メッセージ処理 ---
     final message = MessageModel.fromJson(data);
 
     ref
@@ -147,6 +160,14 @@ Future<void> _connectWebSocket() async {
                             DateFormat('HH:mm').format(msg.createdAt),
                             style: const TextStyle(fontSize: 11, color: Colors.grey),
                           ),
+                          if (isMe)
+                            Text(
+                              msg.isRead ? '既読' : '未読',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: msg.isRead ? Colors.green : Colors.grey,
+                              ),
+                            ),
                         ],
                       ),
                     );

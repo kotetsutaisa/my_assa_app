@@ -1,11 +1,12 @@
 import json
-from .models import Conversation, Message
+from .models import Conversation, Message, MessageRead
 from .serializers import ConversationSerializer, ParticipantSerializer, MessageSerializer
 from .utils import is_user_online
 from timeline.permissions import IsCompanyMember
 
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.serializers import ValidationError
+from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from asgiref.sync import async_to_sync
@@ -130,6 +131,42 @@ class MessageListCreateAPIView(ListCreateAPIView):
         context = super().get_serializer_context()
         context['conversation_id'] = self.kwargs['conversation_id']
         return context
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        conversation_id = self.kwargs.get('conversation_id')
+        user = request.user
+
+        conversation = Conversation.objects.get(id=conversation_id)
+        partner = conversation.participants.exclude(user=user).first()
+
+        if partner:
+            for message in queryset:
+                if message.sender == user:
+                    continue
+
+                is_read = MessageRead.objects.filter(message=message, user=user).exists()
+                if not is_read:
+                    MessageRead.objects.get_or_create(
+                        message=message,
+                        user=user,
+                    )
+                
+                partner_online = is_user_online(partner.user.id, str(conversation.id))
+                if partner_online:
+                    channel_layer = get_channel_layer()
+                    async_to_sync(channel_layer.group_send)(
+                        f"chat_{conversation.id}",
+                        {
+                            "type": "chat.read",
+                            "message_id": str(message.id),
+                            "reader_id": user.id,
+                        }
+                    )
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
         
     def perform_create(self, serializer):
         message = serializer.save()
@@ -144,9 +181,14 @@ class MessageListCreateAPIView(ListCreateAPIView):
             partner_online = is_user_online(partner_id, str(conversation.id))
 
             if partner_online:
+                MessageRead.objects.get_or_create(
+                    message=message,
+                    user=partner.user,
+                )
+
                 channel_layer = get_channel_layer()
                 safe_message = json.loads(
-                    json.dumps(MessageSerializer(message).data, default=str)
+                    json.dumps(MessageSerializer(message, context={"request": self.request}).data, default=str)
                 )
                 async_to_sync(channel_layer.group_send)(
                     f"chat_{conversation.id}",

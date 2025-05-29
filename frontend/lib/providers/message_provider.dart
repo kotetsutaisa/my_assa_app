@@ -45,6 +45,18 @@ class MessageListNotifier extends StateNotifier<AsyncValue<List<MessageModel>>> 
     final current = state.value ?? [];
     state = AsyncValue.data([...current, message]);
   }
+
+  void markMessageAsRead(String messageId) {
+    final current = state.value ?? [];
+
+    state = AsyncValue.data([
+      for (final msg in current)
+        if (msg.id == messageId)
+          msg.copyWith(isRead: true)
+        else
+          msg
+    ]);
+  }
 }
 
 final messageListProvider = StateNotifierProvider.family<

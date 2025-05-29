@@ -98,11 +98,18 @@ class ParticipantSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
 
     sender = SimpleUserSerializer(read_only=True)
+    is_read = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
-        fields = ('id', 'conversation', 'sender', 'kind', 'body', 'created_at')
+        fields = ('id', 'conversation', 'sender', 'kind', 'body', 'created_at', 'is_read')
         read_only_fields = ('id', 'sender', 'created_at')
+
+    def get_is_read(self, obj):
+        user = self.context['request'].user
+        partner = obj.conversation.participants.exclude(user=user).first()
+        return MessageRead.objects.filter(message=obj, user=partner.user).exists()
+        
 
     def create(self, validated_data):
         request = self.context['request']
