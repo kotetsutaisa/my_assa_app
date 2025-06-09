@@ -70,6 +70,22 @@
 
 ---
 
+## 💼 転職活動中です
+
+未熟ではありますがこのリポジトリは、技術力・構想力・実行力を見てもらうために公開しています。
+
+- 実務の開発は未経験ですが、個人で企画〜デザイン〜設計〜実装までを継続中です
+
+---
+
+## 📬 Contact
+
+- GitHub: [@kotetsutaisa](https://github.com/kotetsutaisa)
+- X: [@fujita_django](https://twitter.com/fujita_django)
+
+
+---
+
 ## 🧪 ローカル開発・セットアップ
 
 ```bash
