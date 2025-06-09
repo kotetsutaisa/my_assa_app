@@ -120,19 +120,22 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             Center(
               child: Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.grey[300],
-                    backgroundImage: _selectedImage != null
-                        ? FileImage(_selectedImage!)
-                        : (user?.iconimg != null
-                            ? CachedNetworkImageProvider(
-                              resolveImageUrl(user!.iconimg!)
-                            )
-                            : null) as ImageProvider?,
-                    child: (user?.iconimg == null && _selectedImage == null)
-                        ? const Icon(Icons.person, color: Colors.white, size: 40)
-                        : null,
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.grey[300],
+                      backgroundImage: _selectedImage != null
+                          ? FileImage(_selectedImage!)
+                          : (user?.iconimg != null
+                              ? CachedNetworkImageProvider(
+                                resolveImageUrl(user!.iconimg!)
+                              )
+                              : null) as ImageProvider?,
+                      child: (user?.iconimg == null && _selectedImage == null)
+                          ? const Icon(Icons.person, color: Colors.white, size: 40)
+                          : null,
+                    ),
                   ),
 
                   // プラスボタン

@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:frontend/screens/chat/chat_list_page.dart';
-import 'package:frontend/providers/current_page_provider.dart';
 
-class ChatHeader extends ConsumerWidget implements PreferredSizeWidget {
+class GroupChatSettingsWidget extends ConsumerWidget implements PreferredSizeWidget {
   final String username;
   final String? userIconUrl;
   final Widget? trailing;
   final BoxDecoration? decoration;
 
-  const ChatHeader({
+  const GroupChatSettingsWidget({
     super.key,
     required this.username,
     this.userIconUrl,
@@ -36,9 +34,7 @@ class ChatHeader extends ConsumerWidget implements PreferredSizeWidget {
                   alignment: Alignment.centerLeft,
                   child: IconButton(
                     icon: const Icon(Icons.arrow_back),
-                    onPressed: () {
-                      ref.read(currentPageProvider.notifier).state = const ChatListPage();
-                    },
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
                 ),
 
@@ -58,13 +54,6 @@ class ChatHeader extends ConsumerWidget implements PreferredSizeWidget {
                     ),
                   ],
                 ),
-
-                // 🔧 右側オプション（任意）
-                if (trailing != null)
-                  Positioned(
-                    right: 0,
-                    child: trailing!,
-                  ),
               ],
             ),
           ),
@@ -77,5 +66,3 @@ class ChatHeader extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => const Size.fromHeight(72);
 }
-
-

@@ -4,16 +4,24 @@ build/
 .packages
 .pub-cache/
 pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
 
 # Django
 backend/__pycache__/
 backend/db.sqlite3
 backend/env/
+backend/.env
 backend/.venv/
 backend/.mypy_cache/
 backend/staticfiles/
 
+# Flutter環境変数
+frontend/.env
+
 # 共通
+.env
+*.env
 venv/
 .idea/
 *.pyc
@@ -24,3 +32,4 @@ venv/
 .DS_Store
 *.swp
 *.swo
+

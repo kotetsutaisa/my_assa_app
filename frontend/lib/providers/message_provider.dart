@@ -21,7 +21,7 @@ class MessageListNotifier extends StateNotifier<AsyncValue<List<MessageModel>>> 
     }
   }
 
-  Future<void> addMessage({
+  Future<MessageModel> addMessage({
     required String kind,
     required String bodyText,
   }) async {
@@ -33,13 +33,17 @@ class MessageListNotifier extends StateNotifier<AsyncValue<List<MessageModel>>> 
         kind: kind,
         body: bodyText,
       );
-      // 最新の state に追加（先頭 or 末尾どちらでもOK）
+
       final current = state.value ?? [];
       state = AsyncValue.data([...current, newMessage]);
+
+      return newMessage; // ✅ 正常時は必ず返す
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      rethrow; // ✅ 必ず再スローすることで return しない状態を回避
     }
   }
+
 
   void addReceivedMessage(MessageModel message) {
     final current = state.value ?? [];
