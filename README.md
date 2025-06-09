@@ -46,14 +46,12 @@
 
 ## 📸 UI（開発中）
 
-| ホーム画面 | スケジュール画面 |
-|--------------|------------------|
-| <p align="center">
-  <img src="./screenshots/home_ui.png" width="350" />
-</p> 
-| ![schedule_ui](./screenshots/schedule_ui.png) |
+<p align="center">
+  <img src="./screenshots/home_ui.png" width="300" />
+  <br>
+  <em>ホーム画面：今後様々な機能をここに追加します</em>
+</p>
 
-※ UIはFlutterで構築中。直感的に使えるUXを追求中です。
 
 ---
 
