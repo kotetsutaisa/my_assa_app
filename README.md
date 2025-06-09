@@ -46,9 +46,9 @@
 
 ## 📸 UI（開発中）
 
-| チャット画面 | スケジュール画面 |
+| ホーム画面 | スケジュール画面 |
 |--------------|------------------|
-| ![chat_ui](./screenshots/chat_ui.png) | ![schedule_ui](./screenshots/schedule_ui.png) |
+| ![chat_ui](./screenshots/home_ui.png) | ![schedule_ui](./screenshots/schedule_ui.png) |
 
 ※ UIはFlutterで構築中。直感的に使えるUXを追求中です。
 
