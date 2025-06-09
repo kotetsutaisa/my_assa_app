@@ -81,7 +81,7 @@
 ## 📬 Contact
 
 - GitHub: [@kotetsutaisa](https://github.com/kotetsutaisa)
-- X: [@fujita_django](https://twitter.com/fujita_django)
+- X: [@fujita_django](https://x.com/fujta_django)
 
 
 ---
