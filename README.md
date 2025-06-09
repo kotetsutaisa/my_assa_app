@@ -47,9 +47,10 @@
 ## 📸 UI（開発中）
 
 <p align="center">
-  <img src="./screenshots/home_ui.png" width="300" />
-  <br>
-  <em>ホーム画面：今後様々な機能をここに追加します</em>
+  <img src="./screenshots/home_ui.png" width="160" />
+  <img src="./screenshots/timeline_ui.png" width="160" />
+  <img src="./screenshots/chat_ui.png" width="160" />
+  <img src="./screenshots/sub_ui.png" width="160" />
 </p>
 
 
