@@ -1,14 +1,16 @@
 from rest_framework import serializers
-from .models import Conversation, Participant, Message, MessageRead
+from .models import Conversation, Participant, Message, MessageRead, InvitationConversation
 from users.serializers import SimpleUserSerializer
+
 
 class ConversationSerializer(serializers.ModelSerializer):
     icon = serializers.ImageField(required=False, allow_null=True)
     partner_user = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
-        fields = ('id', 'company', 'title', 'is_group', 'icon','created_at', 'updated_at', 'partner_user',)
+        fields = ('id', 'company', 'title', 'is_group', 'icon','created_at', 'updated_at', 'partner_user', 'last_message')
         read_only_fields = ('id', 'company', 'created_at', 'updated_at')
 
     # ----------------- バリデーション -----------------
@@ -66,9 +68,31 @@ class ConversationSerializer(serializers.ModelSerializer):
             return SimpleUserSerializer(partner.user, context=self.context).data
         return None
     
+    def get_last_message(self, obj):
+        body = getattr(obj, 'last_message_content', None)
+        if isinstance(body, dict):
+            body = body.get("text")  # ✅ 'text' フィールドを抽出
+        return {
+            "content": body,
+            "created_at": getattr(obj, 'last_message_created_at', None),
+        }
+
+    
+
+# --- 招待と通常ルームを結合 ---
+class ConversationWrapperSerializer(serializers.Serializer):
+    conversation = ConversationSerializer()
+    is_invited = serializers.BooleanField()
+    invited_by = SimpleUserSerializer(required=False)
+
+    class Meta:
+        fields = ['conversation', 'is_invited', 'invited_by']
+
 
 
 class ParticipantSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    conversation = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Participant
@@ -76,8 +100,9 @@ class ParticipantSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
 
-        user = data["user"]
-        conversation = data["conversation"]
+        request_user = self.context['request'].user
+        user = self.context.get('user', request_user)
+        conversation = self.context['conversation']
         
         # 同じユーザーがすでに参加していないか
         if Participant.objects.filter(user=user, conversation=conversation, left_at__isnull=True).exists():
@@ -94,22 +119,42 @@ class ParticipantSerializer(serializers.ModelSerializer):
     
         return data
     
+    def create(self, validated_data):
+        request = self.context['request']
+        conversation = self.context['conversation']
+
+        validated_data['conversation'] = conversation
+        validated_data['user'] = self.context.get('user', request.user)
+        return super().create(validated_data)
+    
+
+    
 
 class MessageSerializer(serializers.ModelSerializer):
 
     sender = SimpleUserSerializer(read_only=True)
     is_read = serializers.SerializerMethodField()
+    read_users = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
-        fields = ('id', 'conversation', 'sender', 'kind', 'body', 'created_at', 'is_read')
+        fields = ('id', 'conversation', 'sender', 'kind', 'body', 'created_at', 'is_read', 'read_users')
         read_only_fields = ('id', 'sender', 'created_at')
 
     def get_is_read(self, obj):
         user = self.context['request'].user
         partner = obj.conversation.participants.exclude(user=user).first()
+        if partner is None:
+            return False
         return MessageRead.objects.filter(message=obj, user=partner.user).exists()
         
+    def get_read_users(self, obj):
+        if obj is None:
+            return []
+        
+        return list(
+            MessageRead.objects.filter(message=obj).values_list('user__id', flat=True)
+        )
 
     def create(self, validated_data):
         request = self.context['request']
@@ -137,3 +182,16 @@ class MessageReadSirializer(serializers.ModelSerializer):
         fields = ('message', 'user', 'read_at')
         read_only_fields = ('message', 'user', 'read_at',)
         
+
+# post用
+class InvitationConversationSerializer(serializers.Serializer):
+    partners = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False
+    )
+
+# patch用
+class InvitationUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvitationConversation
+        fields = ['is_participated']

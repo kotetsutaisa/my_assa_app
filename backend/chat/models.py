@@ -127,7 +127,7 @@ class Participant(models.Model):
 
 # メッセージの中身
 class Message(models.Model):
-    
+
     id = ULIDField(primary_key=True)
 
     conversation = models.ForeignKey(
@@ -231,3 +231,48 @@ class MessageRead(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user} read {self.message} at {self.read_at:%Y-%m-%d %H:%M:%S}"
+    
+
+# --- グループチャット招待テーブル ---
+class InvitationConversation(models.Model):
+    conversation = models.ForeignKey(
+        "chat.Conversation",
+        on_delete=models.CASCADE,
+        related_name="invitations",
+        verbose_name=_("会話"),
+    )
+
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sent_invitations",
+        verbose_name=_("招待したユーザー"),
+    )
+
+    invitee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="group_chat_invitations",
+        verbose_name=_("招待されたユーザー"),
+    )
+
+    invited_at = models.DateTimeField(
+        _("招待時刻"),
+        auto_now_add=True
+    )
+
+    is_participated = models.BooleanField(
+        _("参加済み"),
+        default=False
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["conversation", "invitee"],
+                name="unique_invitation_per_conversation"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.invited_by.username} → {self.invitee.username} @ {self.conversation.title or 'DM'}"
