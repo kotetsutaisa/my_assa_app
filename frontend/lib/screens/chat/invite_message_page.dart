@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/models/convInvi_model.dart';
 import 'package:frontend/providers/conversation_list_provider.dart';
 import 'package:frontend/providers/current_page_provider.dart';
+import 'package:frontend/screens/chat/chat_list_page.dart';
 import 'package:frontend/screens/chat/message_page.dart';
 import 'package:frontend/widgets/chat_header.dart';
 
@@ -70,9 +71,14 @@ class _InviteMessagePage extends ConsumerState<InviteMessagePage> {
                         const SizedBox(width: 32),
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () {
-                              ref.read(currentPageProvider.notifier).state =
-                                  MessagePage(conversation: widget.invite.conversation!);
+                            onPressed: () async {
+                              final notifier = ref.read(conversationListProvider.notifier);
+                              try {
+                                await notifier.deleteInviteById(widget.invite.conversation!.id);
+                                ref.read(currentPageProvider.notifier).state = ChatListPage();
+                              } catch (e) {
+                                print("削除に失敗: $e");
+                              }           
                             },
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

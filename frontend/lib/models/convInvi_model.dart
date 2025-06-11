@@ -25,10 +25,10 @@ class ConvInviModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'conversation': conversation?.toJson(),
-        'is_invited': isInvited,
-        'invited_by': invitedBy?.toJson(),
-      };
+    'conversation': conversation?.toJson(),
+    'is_invited': isInvited,
+    'invited_by': invitedBy?.toJson(),
+  };
 
   ConvInviModel copyWith({
     ConversationModel? conversation,

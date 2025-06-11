@@ -20,6 +20,15 @@ class InvitationNotifier extends StateNotifier<List<InvitationModel>> {
     state = state.where((i) => i.id != invitationId).toList();
   }
 
+  Future<void> declineInvitation(Dio dio, String conversationId, String invitationId) async {
+    try {
+      await dio.delete('/chat/conversation/$conversationId/invite/');
+      remove(invitationId);
+    } catch (e) {
+      throw Exception('招待の辞退に失敗しました: $e');
+    }
+  }
+
   void add(InvitationModel invitation) {
     state = [invitation, ...state];
   }
