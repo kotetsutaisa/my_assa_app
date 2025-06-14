@@ -8,10 +8,10 @@ class MessageListNotifier extends StateNotifier<AsyncValue<List<MessageModel>>> 
   final String conversation_id;
 
   MessageListNotifier(this.ref, this.conversation_id) : super(const AsyncValue.loading()) {
-    _fetch();
+    fetch();
   }
 
-  Future<void> _fetch() async {
+  Future<void> fetch() async {
     final dio = ref.read(dioProvider);
     try {
       final message = await messageApi.fetchMessage(dio, conversation_id);

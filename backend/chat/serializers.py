@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from .models import Conversation, Participant, Message, MessageRead, InvitationConversation
 from users.serializers import SimpleUserSerializer
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -86,7 +89,7 @@ class ConversationWrapperSerializer(serializers.Serializer):
     invited_by = SimpleUserSerializer(required=False)
 
     class Meta:
-        fields = ['conversation', 'is_invited', 'invited_by']
+        fields = ['conversation', 'is_invited', 'invited_by',]
 
 
 
@@ -195,3 +198,17 @@ class InvitationUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = InvitationConversation
         fields = ['is_participated']
+
+# get用
+class CandidateUserSerializer(SimpleUserSerializer):
+
+    is_invited = serializers.SerializerMethodField()
+
+    class Meta(SimpleUserSerializer.Meta):
+        fields = SimpleUserSerializer.Meta.fields + ('is_invited',)
+
+    def get_is_invited(self, obj) -> bool:
+        # このユーザーが既に招待済みかどうかを判定する
+        invited_user_ids = self.context.get('invited_user_ids', set())
+        # 現在処理しているユーザー(obj)のIDがセットに含まれていればTrue
+        return obj.id in invited_user_ids

@@ -1,6 +1,6 @@
 import json
 from .models import Conversation, Message, MessageRead, InvitationConversation, Participant
-from .serializers import ConversationSerializer, ParticipantSerializer, MessageSerializer, InvitationConversationSerializer, ConversationWrapperSerializer, InvitationUpdateSerializer
+from .serializers import ConversationSerializer, ParticipantSerializer, MessageSerializer, InvitationConversationSerializer, ConversationWrapperSerializer, InvitationUpdateSerializer, CandidateUserSerializer
 from .utils import is_user_online, get_online_users_in_conversation
 from timeline.permissions import IsCompanyMember
 from users.serializers import SimpleUserSerializer
@@ -184,7 +184,7 @@ class ConversationListAPIView(ListAPIView):
             result.append({
                 'conversation': invite.conversation,
                 'is_invited': True,
-                'invited_by': invite.invited_by
+                'invited_by': invite.invited_by,
             })
 
         result.sort(
@@ -263,6 +263,38 @@ class ParticipantAPIView(GenericAPIView):
         )
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+        conversation_id = self.kwargs.get('conversation_id')
+        conversation = get_object_or_404(Conversation, id=conversation_id)
+
+        participant = get_object_or_404(
+            Participant,
+            conversation=conversation,
+            user=user,
+        )
+
+        participant.delete()
+
+        # システムメッセージとしてログに残す（任意）
+        Message.objects.create(
+            conversation=conversation,
+            sender=user,
+            kind='system',
+            body={'text': f"{user.username}さんがグループを退会しました"}
+        )
+
+        # 参加者がいないくなればconversationも削除
+        if not conversation.participants.exists():
+            conversation.delete()
+
+        return Response(
+            {"detail": "グループを退会しました"},
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+        
 
 
 class MessageListCreateAPIView(ListCreateAPIView):
@@ -444,13 +476,22 @@ class InvitationConversationAPIView(UpdateModelMixin, GenericAPIView):
         # すでに参加済みのユーザー
         joined_user_ids = conversation.participants.values_list('user_id', flat=True)
 
+        # この会話にすでに招待済みのユーザーIDを取得
+        invited_user_ids = InvitationConversation.objects.filter(
+            conversation=conversation
+        ).values_list('invitee_id', flat=True)
+
         # 未参加のユーザーのみ返す
         candidates = company_users.exclude(id__in=joined_user_ids).order_by('username')
 
-        serializer = SimpleUserSerializer(candidates, many=True)
+        context = {
+            'invited_user_ids': set(invited_user_ids)
+        }
+
+        serializer = CandidateUserSerializer(candidates, many=True, context=context)
         return Response(serializer.data)
 
-
+    # 将来WebSocketに対応させる
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -512,5 +553,33 @@ class InvitationConversationAPIView(UpdateModelMixin, GenericAPIView):
         self.perform_update(serializer)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def delete(self, request, *args, **kwargs):
+        conversation_id = self.kwargs.get('conversation_id')
+        user = request.user
+        conversation = get_object_or_404(Conversation, id=conversation_id)
 
-    
+        #対象となるユーザーが存在するか確認
+        invitation = get_object_or_404(
+            InvitationConversation,
+            conversation=conversation,
+            invitee=user
+        )
+
+        invitation.delete()
+
+        Message.objects.create(
+            conversation=conversation,
+            sender=user,
+            kind='system',
+            body={'text': f"{user.username}さんが招待を辞退しました"}
+        )
+
+        # 参加者がいないくなればconversationも削除
+        if not conversation.participants.exists():
+            conversation.delete()
+        
+
+        return Response(
+            {"detail": "招待を辞退しました。"},
+            status=status.HTTP_204_NO_CONTENT
+        )

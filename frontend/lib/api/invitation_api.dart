@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:frontend/models/simple_user_model.dart';
+import 'package:frontend/models/candidate_user_model.dart';
 
 // --- チャットグループに招待する処理 ---
 Future<Map<String, dynamic>> createInvite({
@@ -20,8 +20,8 @@ Future<Map<String, dynamic>> createInvite({
 
     return response.data as Map<String, dynamic>;
   } on DioException catch (e) {
-    print('📛 createConversation error: ${e.response?.data}');
-    throw Exception('会話の作成に失敗しました');
+    print('📛 createInvite error: ${e.response?.data}');
+    throw Exception('グループチャットの招待に失敗しました');
   }
 }
 
@@ -49,7 +49,7 @@ Future<Map<String, dynamic>> acceptGroupInvitation({
 }
 
 // --- グループに未参加のユーザー一覧取得 ---
-Future<List<SimpleUserModel>> fetchInviteCandidatesUsers({
+Future<List<CandidateUserModel>> fetchInviteCandidatesUsers({
   required Dio dio,
   required String conversationId,
 }) async {
@@ -61,10 +61,20 @@ Future<List<SimpleUserModel>> fetchInviteCandidatesUsers({
       ),
     );
 
-    final List<dynamic> rawList = response.data;
-    return rawList.map((item) => SimpleUserModel.fromJson(item)).toList();
+    final List<dynamic> data = response.data;
+    return data.map((json) => CandidateUserModel.fromJson(json)).toList();
   } on DioException catch (e) {
     print('📛 fetchInviteUsers error: ${e.response?.data}');
     throw Exception('グループ未参加ユーザー一覧取得に失敗しました');
+  }
+}
+
+// 招待コードの削除
+Future<void> deleteInvite(Dio dio, String conversationId) async {
+  try {
+    await dio.delete('/chat/conversation/$conversationId/invite/');
+  } catch (e) {
+    print('❌ 招待の削除に失敗しました: $e');
+    rethrow;
   }
 }

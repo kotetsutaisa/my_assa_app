@@ -69,7 +69,7 @@ class ConversationListNotifier extends StateNotifier<AsyncValue<List<ConvInviMod
     }
   }
 
-
+  // 会話の削除(見た目だけ)
   Future<void> deleteConversationById(String conversationId) async {
     try {
       final dio = ref.read(dioProvider);
@@ -81,6 +81,31 @@ class ConversationListNotifier extends StateNotifier<AsyncValue<List<ConvInviMod
     }
   }
 
+  // 招待コードの削除
+  Future<void> leaveConversationById(String conversationId) async {
+    try {
+      final dio = ref.read(dioProvider);
+      await exitGroup(dio, conversationId);
+
+      await fetch();
+    } catch (e) {
+      print('❌ グループチャットの退会に失敗: $e');
+      rethrow;
+    }
+  }
+
+  // 招待コードの削除
+  Future<void> deleteInviteById(String conversationId) async {
+    try {
+      final dio = ref.read(dioProvider);
+      await deleteInvite(dio, conversationId);
+
+      await fetch();
+    } catch (e) {
+      print('❌ 招待削除失敗: $e');
+      rethrow;
+    }
+  }
 
 
   Future<void> participateInGroup(String conversationId) async {

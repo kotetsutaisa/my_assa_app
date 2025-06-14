@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/models/conversation_model.dart';
+import 'package:frontend/providers/conversation_list_provider.dart';
+import 'package:frontend/providers/current_page_provider.dart';
+import 'package:frontend/screens/chat/chat_list_page.dart';
 import 'package:frontend/screens/chat/group_invite_page.dart';
 import 'package:frontend/screens/chat/group_list_page.dart';
 import 'package:frontend/widgets/group_chat_settings_widget.dart';
@@ -63,8 +66,15 @@ class _GroupSettingsPage extends ConsumerState<GroupSettingsPage> {
           ListTile(
             leading: const Icon(Icons.exit_to_app, color: Colors.red),
             title: const Text('グループを退会する', style: TextStyle(color: Colors.red)),
-            onTap: () {
-              // 退会処理
+            onTap: () async {
+              final notifier = ref.read(conversationListProvider.notifier);
+              try {
+                await notifier.leaveConversationById(widget.conversation.id);
+                Navigator.popUntil(context, (route) => route.isFirst);
+                ref.read(currentPageProvider.notifier).state = ChatListPage();
+              } catch (e) {
+                print("削除に失敗: $e");
+              } 
             },
           ),
         ],

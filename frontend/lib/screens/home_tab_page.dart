@@ -4,6 +4,7 @@ import 'package:frontend/providers/current_page_provider.dart';
 import 'package:frontend/screens/company/company_page.dart';
 import 'package:frontend/screens/invitation_page.dart';
 import 'package:frontend/screens/new_work_page.dart';
+import 'package:frontend/screens/site/site_list_page.dart';
 import 'package:frontend/screens/track_page.dart';
 import 'package:frontend/utils/constants.dart';
 import 'package:frontend/widgets/column_button.dart';
@@ -110,46 +111,39 @@ class _HomeTabPageState extends ConsumerState<HomeTabPage> {
 
           // メイン
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 50, 16, 0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
+            child: GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true, // Column内で使うために必要
+              physics: const NeverScrollableScrollPhysics(), // スクロールしない
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
               children: [
-                // プロフィール
-                Expanded(
-                  child: ColumnButton(
-                    iconPath: 'assets/icons/company.svg',
-                    label: '会社メンバー',
-                    onTap: () => ref.read(currentPageProvider.notifier).state = const CompanyPage(),
-                  ),
+                ColumnButton(
+                  iconPath: 'assets/icons/company.svg',
+                  label: '会社メンバー',
+                  onTap: () => ref.read(currentPageProvider.notifier).state = const CompanyPage(),
                 ),
-            
-                // 搬入・搬出
-                Expanded(
-                  child: ColumnButton(
-                    iconPath: 'assets/icons/track.svg',
-                    label: '搬入・搬出',
-                    onTap: () => ref.read(currentPageProvider.notifier).state = const TrackPage(),
-                  ),
+                ColumnButton(
+                  iconPath: 'assets/icons/site.svg',
+                  label: '現場',
+                  onTap: () => ref.read(currentPageProvider.notifier).state = const SiteListPage(),
                 ),
-            
-                // 新規入場
-                Expanded(
-                  child: ColumnButton(
-                    iconPath: 'assets/icons/new_work.svg',
-                    label: '新規入場',
-                    onTap: () => ref.read(currentPageProvider.notifier).state = const NewWorkPage(),
-                  ),
+                ColumnButton(
+                  iconPath: 'assets/icons/track.svg',
+                  label: '搬入・搬出',
+                  onTap: () => ref.read(currentPageProvider.notifier).state = const TrackPage(),
                 ),
-
-                // メンバー招待
-                Expanded(
-                  child: ColumnButton(
-                    iconPath: 'assets/icons/invitation.svg',
-                    label: '招待',
-                    onTap: () => ref.read(currentPageProvider.notifier).state = const InvitePage(),
-                  ),
+                ColumnButton(
+                  iconPath: 'assets/icons/invitation.svg',
+                  label: '招待',
+                  onTap: () => ref.read(currentPageProvider.notifier).state = const InvitePage(),
                 ),
-            
+                ColumnButton(
+                  iconPath: 'assets/icons/new_work.svg',
+                  label: '新規入場',
+                  onTap: () => ref.read(currentPageProvider.notifier).state = const NewWorkPage(),
+                ),
               ],
             ),
           ),

@@ -26,3 +26,13 @@ Future<List<SimpleUserModel>> fetchParticipants(Dio dio, String conversationId) 
   final response = await dio.get('chat/conversation/$conversationId/participant/');
   return (response.data as List).map((e) => SimpleUserModel.fromJson(e)).toList();
 }
+
+// 招待コードの削除
+Future<void> exitGroup(Dio dio, String conversationId) async {
+  try {
+    await dio.delete('/chat/conversation/$conversationId/participant/');
+  } catch (e) {
+    print('❌ 招待の削除に失敗しました: $e');
+    rethrow;
+  }
+}

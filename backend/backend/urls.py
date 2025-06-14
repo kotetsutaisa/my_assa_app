@@ -34,7 +34,8 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('api/posts/', include('timeline.urls')),
     path('api/companies/', include('companies.urls')),
-    path('api/chat/', include('chat.urls'))
+    path('api/chat/', include('chat.urls')),
+    path('api/sites/', include('site_app.urls'))
 ]
 
 if settings.DEBUG:
