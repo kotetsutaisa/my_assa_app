@@ -11,6 +11,8 @@ import 'screens/splash_screen.dart';
 import 'screens/login/login_page.dart';
 import 'screens/login/register_page.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,18 @@ class MyApp extends StatelessWidget {
       title: 'My App',
       debugShowCheckedModeBanner: false,
       theme: appTheme,
+
+      locale: const Locale('ja'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ja'),
+        Locale('en'),
+      ],
+
       initialRoute: '/', // 最初に表示する画面
       routes: {
         '/': (context) => const SplashScreen(),

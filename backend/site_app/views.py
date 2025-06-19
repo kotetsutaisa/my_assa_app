@@ -6,6 +6,7 @@ from .models import Site
 from timeline.permissions import IsCompanyMember
 
 from django.shortcuts import get_object_or_404
+from utils.geocode import geocode_address
 
 
 # 一覧 & 作成
@@ -19,7 +20,16 @@ class SiteListCreateAPIView(ListCreateAPIView):
     
     def perform_create(self, serializer):
         company = self.request.user.company
-        serializer.save(company=company)
+        site = serializer.save(company=company)
+
+        if site.address and (not site.latitude or not site.longitude):
+            try:
+                lat, lng = geocode_address(site.address)
+                site.latitude = lat
+                site.longitude = lng
+                site.save()
+            except Exception as e:
+                print(f"ジオコーディング失敗: {e}")
 
 # 詳細 & 更新 & 削除
 class SiteDetailAPIView(RetrieveUpdateDestroyAPIView):

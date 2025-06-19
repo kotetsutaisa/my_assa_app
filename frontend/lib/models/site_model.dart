@@ -1,7 +1,7 @@
 
 
 class SiteModel {
-  final String id;
+  final String? id;
   final int? companyId;
   final String name;
   final String? address;
@@ -11,8 +11,8 @@ class SiteModel {
   final String? managerName;
   final String? managerPhone;
   final String? memo;
-  final DateTime? startDate;
-  final DateTime? endDate;
+  final DateTime startDate;
+  final DateTime endDate;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isActive;
@@ -28,8 +28,8 @@ class SiteModel {
     this.managerName,
     this.managerPhone,
     this.memo,
-    this.startDate,
-    this.endDate,
+    required this.startDate,
+    required this.endDate,
     required this.createdAt,
     required this.updatedAt,
     required this.isActive,
@@ -47,8 +47,8 @@ class SiteModel {
       managerName: json['manager_name'],
       managerPhone: json['manager_phone'],
       memo: json['memo'],
-      startDate: json['start_date'] != null ? DateTime.parse(json['start_date']) : null,
-      endDate: json['end_date'] != null ? DateTime.parse(json['end_date']) : null,
+      startDate: DateTime.parse(json['start_date']),
+      endDate: DateTime.parse(json['end_date']),
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       isActive: json['is_active'],
@@ -67,8 +67,8 @@ class SiteModel {
       'manager_name': managerName,
       'manager_phone': managerPhone,
       'memo': memo,
-      'start_date': startDate?.toIso8601String(),
-      'end_date': endDate?.toIso8601String(),
+      'start_date': startDate.toIso8601String(),
+      'end_date': endDate.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'is_active': isActive,

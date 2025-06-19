@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/providers/site_provider.dart';
+import 'package:frontend/screens/site/site_create_page.dart';
+import 'package:frontend/screens/site/site_detail_page.dart';
 import 'package:frontend/widgets/post_button.dart';
 import 'package:frontend/widgets/sub_header.dart';
+
+// TODO: 権限があるユーザーのみ削除、変種ボタンを表示する
+
 
 class SiteListPage extends ConsumerStatefulWidget {
   const SiteListPage({super.key});
@@ -56,7 +61,7 @@ class _SiteListPage extends ConsumerState<SiteListPage> {
                                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                       color: site.isActive
                                           ? Colors.green
-                                          : Theme.of(context).colorScheme.outline,
+                                          : Theme.of(context).colorScheme.secondary,
                                     ),
                               ),
                             ),
@@ -82,7 +87,12 @@ class _SiteListPage extends ConsumerState<SiteListPage> {
                                       tapTargetSize: MaterialTapTargetSize.shrinkWrap, // ← タップ領域も縮める
                                     ),
                                     onPressed: () {
-                                  
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => SiteDetailPage(site: site),
+                                        ),
+                                      );
                                     },
                                     child: Text('詳細'),
                                   ),
@@ -107,7 +117,12 @@ class _SiteListPage extends ConsumerState<SiteListPage> {
               right: 15,
               child: PostButton(
                 onPressed: () {
-                  Navigator.pushNamed(context, '/post/create');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SiteCreatePage(),
+                    ),
+                  );
                 },
               ),
             ),
