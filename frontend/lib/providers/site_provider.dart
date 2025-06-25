@@ -9,8 +9,6 @@ class SiteListNotifier extends AsyncNotifier<List<SiteModel>> {
     final dio = ref.read(dioProvider);
     return await fetchSite(dio); // ← Dioを渡す！
   }
-
-  
 }
 
 // --- Provider登録 ---

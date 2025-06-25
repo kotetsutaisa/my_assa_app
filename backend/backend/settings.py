@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'timeline',
     'chat',
     'site_app',
+    'schedule',
 ]
 
 MIDDLEWARE = [

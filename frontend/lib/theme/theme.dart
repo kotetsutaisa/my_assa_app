@@ -16,7 +16,7 @@ final ThemeData appTheme = ThemeData(
       // サブカラー
       secondary: Color.fromRGBO(74, 74, 74, 1),
       // サブ背景
-      surface: Color.fromRGBO(235, 235, 235, 1),
+      surface: Color.fromRGBO(244, 244, 244, 1),
       // ボーダーカラー
       outline: Color.fromRGBO(237, 237, 237, 1),
     ),

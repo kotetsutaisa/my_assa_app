@@ -10,7 +10,7 @@ import '../providers/current_page_provider.dart';
 import '../screens/home_tab_page.dart';
 import '../screens/timeline/timeline_tab_page.dart';
 import '../screens/worksite_tab_page.dart';
-import '../screens/schedule_tab_page.dart';
+import '../screens/schedule/schedule_tab_page.dart';
 import '../screens/chat/chat_list_page.dart';
 import '../screens/profile/profile_tab_page.dart';
 
