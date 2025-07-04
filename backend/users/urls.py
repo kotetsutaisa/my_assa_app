@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import CustomTokenObtainPairView
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import CustomTokenObtainPairView, UserRegisterView
+from .views import CustomTokenObtainPairView, UserRegisterView, UserDetailView
 from .views import GetCurrentUser, CustomTokenRefreshView, UpdateCurrentUser, ConpanyUserAPIView
 
 urlpatterns = [
@@ -11,4 +11,5 @@ urlpatterns = [
     path('current/', GetCurrentUser.as_view(), name='get-current-user'),
     path('current/update/', UpdateCurrentUser.as_view(), name='update-current-user'),
     path('company-users/', ConpanyUserAPIView.as_view(), name='company-user-list'),
+    path('<int:user_id>/', UserDetailView.as_view(), name='user-detail'),
 ]

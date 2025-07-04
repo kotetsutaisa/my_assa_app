@@ -45,6 +45,7 @@ class SimpleUserSerializer(serializers.ModelSerializer):
 class FullUserSerializer(serializers.ModelSerializer):
     iconimg = serializers.ImageField(use_url=True)
     company = CompanyCreateSerializer(read_only=True)
+    team = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -59,7 +60,18 @@ class FullUserSerializer(serializers.ModelSerializer):
             "role",
             "is_active",
             "date_joined",
+            "team",
         )
+
+    def get_team(self, obj):
+        team_member = obj.team_memberships.all().select_related('team').first()
+        if team_member:
+            return {
+                'id': team_member.team.id,
+                'name': team_member.team.name,
+                'role': team_member.role,
+            }
+        return None
 
 # --------------------------------------------------
 # 2. JWT ログイン

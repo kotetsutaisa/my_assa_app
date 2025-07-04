@@ -42,3 +42,12 @@ class PostListNotifier extends AsyncNotifier<List<PostModel>> {
 final postListProvider =
     AsyncNotifierProvider<PostListNotifier, List<PostModel>>(() => PostListNotifier());
 
+
+final userPostListProvider =
+    FutureProvider.family<List<PostModel>, int>((ref, userId) async {
+  final dio = ref.read(dioProvider);
+  final res = await dio.get('/posts/$userId/');
+  return (res.data as List)
+      .map<PostModel>((e) => PostModel.fromJson(e as Map<String, dynamic>))
+      .toList();
+});

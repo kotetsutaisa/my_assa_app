@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
 from rest_framework import generics, status
@@ -112,4 +113,23 @@ class ConpanyUserAPIView(generics.ListAPIView):
                 .filter(company=user.company, is_active=True)
                 .exclude(id=user.id)
                 .select_related('company')
+        )
+    
+
+
+# --- 特定のユーザー個人の情報を取得 ---
+class UserDetailView(generics.RetrieveAPIView):
+    serializer_class = FullUserSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+
+    def get_object(self):
+        me = self.request.user
+        company = me.company
+        user_id = self.kwargs["user_id"]
+
+        return get_object_or_404(
+            User,
+            id=user_id,
+            company=company,
+            is_active=True,
         )

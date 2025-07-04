@@ -1,7 +1,9 @@
 from django.contrib import admin
-from .models import Company
+from .models import Company, Team, TeamMember
 from django.utils.html import format_html
 
+admin.site.register(Team)
+admin.site.register(TeamMember)
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
     list_display = (

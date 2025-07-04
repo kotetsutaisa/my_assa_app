@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/models/user_model.dart';
 import 'package:frontend/providers/my_post_list_provider.dart';
+import 'package:frontend/providers/post_list_provider.dart';
+import 'package:frontend/providers/user_profile_provider.dart';
 import 'package:frontend/providers/user_provider.dart';
 import 'package:frontend/screens/profile/edit_profile_page.dart';
 import 'package:frontend/utils/constants.dart';
@@ -9,7 +12,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 
 class ProfileTabPage extends ConsumerStatefulWidget {
-  const ProfileTabPage({super.key});
+  final int? userId;
+
+  const ProfileTabPage({super.key, this.userId});
 
   @override
   ConsumerState<ProfileTabPage> createState() => _ProfileTabPage();
@@ -25,91 +30,117 @@ class _ProfileTabPage extends ConsumerState<ProfileTabPage> {
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(userProvider);
-    final myPostsAsync = ref.watch(myPostListProvider);
+    final AsyncValue<UserModel> profileAsync = widget.userId == null
+      ? AsyncValue.data(ref.watch(userProvider)!)
+      : ref.watch(userProfileProvider(widget.userId!));
 
+    final postsAsync = widget.userId == null
+        ? ref.watch(myPostListProvider)                       // 自分の投稿
+        : ref.watch(userPostListProvider(widget.userId!));    // 他人の投稿
 
     return DefaultTabController(
       length: 3,
       child: Scaffold(
         body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          headerSliverBuilder: (context, _) => [
+            // ② プロフィールヘッダは profileAsync.when で描画
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Stack(
-                  children: [
-                    Column(
-                      children: [
-                        Center(
-                          child: user?.iconimg != null
-                              ? CircleAvatar(
-                                  radius: 25,
-                                  backgroundImage: CachedNetworkImageProvider(resolveImageUrl(user!.iconimg!)),
-                                  backgroundColor: Colors.grey[200],
-                                )
-                              : CircleAvatar(
-                                  radius: 25,
-                                  backgroundColor: Theme.of(context).primaryColor,
-                                  child: const Icon(Icons.person, color: Colors.white, size: 30),
-                                ),
-                        ),
-                        const SizedBox(height: 15),
-                        Text(
-                          user?.username ?? 'ゲスト',
-                          style: Theme.of(context).textTheme.headlineLarge,
-                        ),
-                        const SizedBox(height: 15),
-                        Text(
-                          user?.accountId ?? '@sample',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Theme.of(context).colorScheme.secondary,
+              child: profileAsync.when(
+                loading: () => const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator())),
+                error: (e, _) => Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(child: Text('エラー: $e'))),
+                data: (user) => Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Stack(
+                    children: [
+                      /// ---------- 上半分 (アイコン・名前など) ----------
+                      Column(
+                        children: [
+                          Center(
+                            child: user.iconimg != null
+                                ? CircleAvatar(
+                                    radius: 25,
+                                    backgroundImage: CachedNetworkImageProvider(
+                                        resolveImageUrl(user.iconimg!)),
+                                    backgroundColor: Colors.grey[200],
+                                  )
+                                : CircleAvatar(
+                                    radius: 25,
+                                    backgroundColor:
+                                        Theme.of(context).primaryColor,
+                                    child: const Icon(Icons.person,
+                                        color: Colors.white, size: 30),
+                                  ),
                           ),
-                        ),
-                        const SizedBox(height: 15),
-                        Text(
-                          user?.email ?? '',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                        ),
-                        const SizedBox(height: 15),
-                        if (user?.bio != null && user!.bio!.isNotEmpty)
-                          Text(
-                            user.bio!,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.normal,
-                            ),
-                          ),
-                      ],
-                    ),
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => EditProfilePage()),
-                          );
-                        },
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          side: BorderSide(color: Theme.of(context).colorScheme.primary),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          foregroundColor: Theme.of(context).colorScheme.primary,
-                        ),
-                        child: const Text('編集', style: TextStyle(fontSize: 14)),
+                          const SizedBox(height: 15),
+                          Text(user.username,
+                              style:
+                                  Theme.of(context).textTheme.headlineLarge),
+                          const SizedBox(height: 15),
+                          Text(user.accountId,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary)),
+                          const SizedBox(height: 15),
+                          Text(user.email,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary)),
+                          const SizedBox(height: 15),
+                          if (user.bio != null && user.bio!.isNotEmpty)
+                            Text(user.bio!,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(fontWeight: FontWeight.normal)),
+                        ],
                       ),
-                    ),
-                  ],
+                      /// ---------- 編集ボタン（自分のときだけ） ----------
+                      if (widget.userId == null)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const EditProfilePage()),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              side: BorderSide(
+                                  color: Theme.of(context).colorScheme.primary),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                            ),
+                            child: const Text('編集',
+                                style: TextStyle(fontSize: 14)),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
             const SliverToBoxAdapter(child: Divider()),
-
+            // ③ タブバーはそのまま
             SliverPersistentHeader(
               pinned: true,
               delegate: _SliverTabBarDelegate(
@@ -126,10 +157,12 @@ class _ProfileTabPage extends ConsumerState<ProfileTabPage> {
               ),
             ),
           ],
+          // ④ 投稿タブは postsAsync を使用
           body: TabBarView(
             children: [
-              myPostsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+              postsAsync.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('エラー: $e')),
                 data: (posts) => MyPostList(posts: posts),
               ),

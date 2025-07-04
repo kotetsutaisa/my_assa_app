@@ -1,7 +1,12 @@
+import uuid
+from django.utils.translation import gettext_lazy as _
 from django.db import models
 from plans.models import Plan  # プランと紐づける
 from django.conf import settings
 from django.utils import timezone
+from django.core.exceptions import ValidationError
+
+User = settings.AUTH_USER_MODEL
 
 # --- 会社モデル ---
 class Company(models.Model):
@@ -75,3 +80,85 @@ class InviteCode(models.Model):
     # 管理画面などでの表示形式
     def __str__(self):
         return f"{self.code}（{self.company.name}）"
+    
+
+# --- 会社のチームモデル ---
+class Team(models.Model):
+    id = models.UUIDField(
+        # 主キー
+        primary_key=True,
+        # ランダムなUUIDを生成
+        default=uuid.uuid4,
+        # 人間が手動でIDを入れることを防ぐ
+        editable=False,
+        help_text=_("URL セーフ & シャーディングしやすい主キー"),
+    )
+
+    company = models.ForeignKey(
+        "companies.Company",
+        on_delete=models.CASCADE,
+        related_name="teams",
+        verbose_name="会社"
+    )
+
+    name = models.CharField("チーム名", max_length=100)
+
+    created_at = models.DateTimeField("作成日時", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "チーム"
+        verbose_name_plural = "チーム一覧"
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.name}（{self.company.name}）"
+
+    @property
+    def member_count(self):
+        return self.members.count()
+    
+
+# チーム参加者モデル
+class TeamMember(models.Model):
+    ROLE_CHOICES = [
+        ('leader', 'リーダー'),
+        ('member', 'メンバー'),
+    ]
+
+    team = models.ForeignKey(
+        Team,
+        on_delete=models.CASCADE,
+        related_name="members",
+        verbose_name="所属チーム"
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="team_memberships",
+        verbose_name="ユーザー"
+    )
+
+    role = models.CharField(
+        "役割",
+        max_length=20,
+        choices=ROLE_CHOICES,
+        default='member',
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    joined_at = models.DateTimeField("参加日時", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "チームメンバー"
+        verbose_name_plural = "チームメンバー一覧"
+        unique_together = ('team', 'user')
+        ordering = ['joined_at']
+
+    def __str__(self):
+        return f"{self.user.username}（{self.team.name}）: {self.get_role_display()}"
+    
+    def clean(self):
+        if self.role == 'leader' and TeamMember.objects.filter(team=self.team, role='leader').exclude(pk=self.pk).exists():
+            raise ValidationError("リーダーは1チームに1人までです。")

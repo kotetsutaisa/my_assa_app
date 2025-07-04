@@ -2,13 +2,12 @@
 import re
 from django.db import transaction
 from rest_framework import serializers
-from .models import Company
+from .models import Company, Team, TeamMember
 from .models import InviteCode
 from datetime import timedelta
 from django.utils import timezone
 import secrets
 import string
-from .models import InviteCode
 
 class CompanyCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -132,3 +131,33 @@ class InviteCodeUseSerializer(serializers.Serializer):
         invite.save(update_fields=['is_used'])
 
         return user
+    
+
+
+class TeamSerializer(serializers.ModelSerializer):
+    members = serializers.SerializerMethodField()
+    member_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Team
+        fields = ['id', 'name', 'company', 'created_at', 'members', 'member_count']
+
+    def get_members(self, obj):
+        team_members = obj.members.select_related('user').order_by('joined_at')
+        return TeamMemberSerializer(team_members, many=True).data
+
+
+
+class TeamMemberSerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeamMember
+        fields = ['id', 'team', 'user', 'role', 'joined_at']
+
+    def get_user(self, obj):
+       from users.serializers import FullUserSerializer
+       return FullUserSerializer(
+           obj.user,
+           context=self.context
+        ).data

@@ -3,16 +3,22 @@ from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from django.db import transaction
 
-from .models import Company
+from .models import Company, Team, TeamMember
 from .serializers import CompanyCreateSerializer
 from .permissions import IsNotAffiliated
 from .throttles import CompanyCreateThrottle   # 無効化したいなら削除
 from utils.audit import register_event         # 監査フック
+from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated
 from .models import InviteCode
 from .serializers import InviteCodeCreateSerializer
 from .serializers import InviteCodeUseSerializer
 from .permissions import IsCompanyAdminOrManager
+from timeline.permissions import IsCompanyMember
+from users.serializers import FullUserSerializer
+from django.db.models import Case, When, IntegerField, Prefetch
+
+User = get_user_model()
 
 class CompanyCreateAPIView(generics.GenericAPIView):
     """
@@ -84,3 +90,99 @@ class JoinCompanyView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save(user=request.user)  # 明示的に渡す
         return Response({"detail": "会社に参加しました"}, status=status.HTTP_200_OK)
+    
+
+
+# 会社メンバーを権限・チームごとに表示
+class CompanyMemberListCreateView(generics.ListCreateAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsCompanyMember]
+
+    def list(self, request, *args, **kwargs):
+        company = request.user.company
+
+        # ────────────────────────────────
+        # 1) admin
+        # ────────────────────────────────
+        admins = User.objects.filter(company=company, role='admin')
+
+        # ────────────────────────────────
+        # 2) チーム無所属 manager / member
+        # ────────────────────────────────
+        managers_no_team = User.objects.filter(
+            company=company,
+            role='manager',
+            team_memberships__isnull=True
+        )
+        members_no_team = User.objects.filter(
+            company=company,
+            role='member',
+            team_memberships__isnull=True
+        )
+
+        # ────────────────────────────────
+        # 3) チーム（リーダーを先頭に並べ替えて取得）
+        #    Case/When でソートキーを付ける
+        # ────────────────────────────────
+        leader_first = Case(
+            When(role='leader', then=0),
+            default=1,
+            output_field=IntegerField()
+        )
+
+        teams = (
+            Team.objects
+            .filter(company=company)
+            .prefetch_related(
+                Prefetch(
+                    'members',
+                    queryset=(
+                        TeamMember.objects
+                        .select_related('user')
+                        .annotate(_leader_first=leader_first)
+                        .order_by('_leader_first', 'joined_at')
+                    )
+                )
+            )
+            .order_by('created_at')          # チーム自体の並び順（お好みで）
+        )
+
+        # ----------------------------------------------------------------
+        # 返却ペイロードを構築
+        # ----------------------------------------------------------------
+        result = []
+
+        # ① admin
+        result.extend({
+            "type": "admin",
+            "user": FullUserSerializer(u).data,
+        } for u in admins)
+
+        # ② チーム無所属 manager
+        result.extend({
+            "type": "no_team_manager",
+            "user": FullUserSerializer(u).data,
+        } for u in managers_no_team)
+
+        # ③ チーム（リーダー→メンバー順で members を作成）
+        for team in teams:
+            members_payload = [
+                {
+                    "user": FullUserSerializer(m.user).data,
+                    "role": m.role,          # 'leader' / 'member'
+                }
+                for m in team.members.all()  # leader が先頭になる
+            ]
+            result.append({
+                "type":       "team",
+                "team_id":    team.id,
+                "team_name":  team.name,
+                "members":    members_payload,
+            })
+
+        # ④ チーム無所属 member
+        result.extend({
+            "type": "no_team_member",
+            "user": FullUserSerializer(u).data,
+        } for u in members_no_team)
+
+        return Response(result)

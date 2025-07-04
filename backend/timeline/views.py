@@ -9,6 +9,9 @@ from .serializers import PostSerializer, CommentSerializer
 from drf_spectacular.utils import extend_schema
 from django.db.models import Count, Exists, OuterRef, Prefetch
 
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
 # --- 投稿一覧API ---
 @extend_schema(
     summary="投稿一覧を取得",
@@ -50,6 +53,48 @@ class PostListView(generics.ListAPIView):
             qs = qs.filter(user=user)
 
         return qs
+    
+
+# --- 自分以外の特定のユーザー個人の投稿取得 ---
+class UserPostsListView(generics.ListAPIView):
+    serializer_class = PostSerializer
+    permission_classes = [IsAuthenticated, IsCompanyMember]
+
+    def get_queryset(self):
+        me = self.request.user
+        company = me.company
+        target_id = self.kwargs["user_id"]
+
+        target_user = get_object_or_404(
+            User,
+            id=target_id,
+            company=company,
+            is_active=True
+        )
+
+        return (
+            Post.objects
+                .filter(company=company, user=target_user)
+                .select_related('user')
+                .prefetch_related(
+                    Prefetch(
+                        'sub_images',
+                        queryset=PostImage.objects.order_by('order')
+                    )
+                )
+                .annotate(
+                    likes_count    = Count('likes'),
+                    comments_count = Count('comments'),
+                    read_count     = Count('read_statuses'),
+                    is_liked       = Exists(
+                        Like.objects.filter(post=OuterRef('pk'), user=me)
+                    ),
+                    is_read        = Exists(
+                        PostReadStatus.objects.filter(post=OuterRef('pk'), user=me)
+                    ),
+                )
+                .order_by('-created_at')
+        )
     
 
 # --- 投稿作成 ---
