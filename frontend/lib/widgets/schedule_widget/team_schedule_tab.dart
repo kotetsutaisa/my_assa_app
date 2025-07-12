@@ -1,25 +1,28 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/constants/site_colors.dart';
 import 'package:frontend/models/schedule_model.dart';
-import 'package:frontend/providers/my_personal_schedule_provider.dart';
-import 'package:frontend/providers/selected_date_provider.dart';
-import 'package:frontend/screens/schedule/edit_schedule_page.dart';
+import 'package:frontend/models/simple_user_model.dart';
+import 'package:frontend/providers/selected_team_date_provider.dart';
+import 'package:frontend/providers/team_schedule_provider.dart';
+import 'package:frontend/screens/schedule/edit_team_schedule_page.dart';
 import 'package:frontend/utils/holiday_data.dart';
+import 'package:frontend/utils/image_helper.dart';
 import 'package:frontend/utils/site_color_util.dart';
 import 'package:frontend/widgets/schedule_widget/schedule_actions.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
-class PersonalScheduleTab extends ConsumerStatefulWidget {
-  const PersonalScheduleTab({super.key});
+class TeamScheduleTab extends ConsumerStatefulWidget {
+  const TeamScheduleTab({super.key});
 
   @override
-  ConsumerState<PersonalScheduleTab> createState() => _PersonalScheduleTabState();
+  ConsumerState<TeamScheduleTab> createState() => _TeamScheduleTabState();
 }
 
-class _PersonalScheduleTabState extends ConsumerState<PersonalScheduleTab> {
+class _TeamScheduleTabState extends ConsumerState<TeamScheduleTab> {
   static const _rowH   = 85.0;
   static const _circle = 28.0;
 
@@ -35,34 +38,22 @@ class _PersonalScheduleTabState extends ConsumerState<PersonalScheduleTab> {
     final start = DateTime(_focused.year, _focused.month, 1);
     final end   = DateTime(_focused.year, _focused.month + 1, 0);
     Future.microtask(() {
-      ref.read(myPersonalScheduleMapProvider.notifier).fetch(start, end);
+      ref.read(teamScheduleMapProvider.notifier).fetch(start, end);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Map<DateOnly, List<ScheduleModel>>
-    final map = ref.watch(myPersonalScheduleMapProvider)
+    final map = ref.watch(teamScheduleMapProvider)
                    .maybeWhen(data: (m) => m, orElse: () => {});
 
-    // 選択日の予定（なければ空リスト）
-    final key = _selected != null ? DateUtils.dateOnly(_selected!) : null;
-
-    final todays = key == null
-        ? <ScheduleModel>[]
-        : map.entries                        // ① 全キーを走査
-            .expand((e) => e.value)          // ② 予定を 1 本ずつ取り出す
-            .where((s) {                     // ③ 開始〜終了の間に key がある？
-              final start = DateUtils.dateOnly(s.startTime);
-              final end   = DateUtils.dateOnly(s.endTime);
-              return !key.isBefore(start) && !key.isAfter(end);
-            })
-            .toList();
+    final key    = _selected != null ? DateUtils.dateOnly(_selected!) : null;
+    final todays = key != null ? (map[key] ?? []) : <ScheduleModel>[];
 
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
-        // ---------- カレンダー ----------
+        /* ────── カレンダー ────── */
         SliverToBoxAdapter(
           child: TableCalendar<ScheduleModel>(
             locale: 'ja_JP',
@@ -77,7 +68,7 @@ class _PersonalScheduleTabState extends ConsumerState<PersonalScheduleTab> {
             onPageChanged: _onPageChanged,
             onDaySelected: (sel, foc) {
               // ❶ 共有プロバイダーを書き換え
-              ref.read(selectedDateProvider.notifier).state = sel;
+              ref.read(selectedTeamDateProvider.notifier).state = sel;
 
               // ❷ 既存のローカル状態も更新
               setState(() {
@@ -101,7 +92,7 @@ class _PersonalScheduleTabState extends ConsumerState<PersonalScheduleTab> {
 
         const SliverPadding(padding: EdgeInsets.only(top: 12)),
 
-        // ---------- 詳細リスト ----------
+        /* ────── 詳細リスト ────── */
         todays.isEmpty
             ? const SliverToBoxAdapter(
                 child: Center(
@@ -112,17 +103,71 @@ class _PersonalScheduleTabState extends ConsumerState<PersonalScheduleTab> {
             : SliverList.separated(
                 itemCount: todays.length,
                 itemBuilder: (context, index) {
-                  final s = todays[index];
+                  final s  = todays[index];
                   final tf = DateFormat('HH:mm');
+
+                  /* ★ メンバー情報（List<SimpleUserModel> 想定） */
+                  final members = s.members;       // ← ScheduleModel にあるメンバー配列
+                  /* ------------------ */
+
                   return ListTile(
+                    isThreeLine: true,
                     leading: IconButton(
                       icon: const Icon(Icons.more_horiz),
                       onPressed: () => _showActions(context, s),
                     ),
-                    title: Text(s.siteName),
-                    subtitle: Text(
-                      '${tf.format(s.startTime)} - ${tf.format(s.endTime)}'
-                      '${s.workCategory != null ? ' ・ ${s.workCategory!.name}' : ''}',
+
+                    /* ---- タイトル & サブタイトル ---- */
+                    title   : Text(s.siteName),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${tf.format(s.startTime)} - ${tf.format(s.endTime)}'
+                          '${s.workCategory != null ? ' ・ ${s.workCategory!.name}' : ''}',
+                        ),
+
+                        /* ---- ↓ メンバー一覧 ↓ ---- */
+                        if (members.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing   : 12,
+                            runSpacing: 8,
+                            children  : members.map<Widget>((SimpleUserModel u) {
+                              final img = u.iconimg;
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: 
+                                      (img != null && img.isNotEmpty) ? Colors.transparent : Theme.of(context).primaryColor,
+                                    backgroundImage: (img != null && img.isNotEmpty)
+                                      ? CachedNetworkImageProvider(resolveImageUrl(img))
+                                      : null,
+                                    child: (img == null || img.isEmpty)
+                                      ? Icon(Icons.person,
+                                          color: Colors.white,
+                                          size: 16)
+                                      : null,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  SizedBox(
+                                    width: 48,
+                                    child: Text(
+                                      u.username,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ],
                     ),
                   );
                 },
@@ -139,16 +184,16 @@ class _PersonalScheduleTabState extends ConsumerState<PersonalScheduleTab> {
 
     final start = DateTime(focusedDay.year, focusedDay.month, 1);
     final end   = DateTime(focusedDay.year, focusedDay.month + 1, 0);
-    ref.read(myPersonalScheduleMapProvider.notifier).fetch(start, end);
+    ref.read(teamScheduleMapProvider.notifier).fetch(start, end);
   }
 
   void _showActions(BuildContext ctx, ScheduleModel s) => showScheduleActionSheet(
     context : ctx,
     schedule: s,
     onEdit  : () => Navigator.push(ctx,
-        MaterialPageRoute(builder: (_) => EditSchedulePage(schedule: s))),
+        MaterialPageRoute(builder: (_) => EditTeamSchedulePage(schedule: s))),
     onDelete: () async {
-      await ref.read(myPersonalScheduleMapProvider.notifier).deleteSchedule(s.id);
+      await ref.read(teamScheduleMapProvider.notifier).deleteSchedule(s.id);
       if (ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
           SnackBar(content: Text('${s.siteName} を削除しました')),
@@ -162,8 +207,8 @@ class _PersonalScheduleTabState extends ConsumerState<PersonalScheduleTab> {
   Widget _buildDow(BuildContext ctx, DateTime d) {
     const labels = ['月','火','水','木','金','土','日'];
     final c = d.weekday == 7
-          ? Colors.red
-          : d.weekday == 6 ? Colors.blue : Colors.black87;
+        ? Colors.red
+        : d.weekday == 6 ? Colors.blue : Colors.black87;
     return Center(
       child: Text(labels[d.weekday - 1],
           style: TextStyle(color: c, fontWeight: FontWeight.bold)),
@@ -262,8 +307,4 @@ class _PersonalScheduleTabState extends ConsumerState<PersonalScheduleTab> {
     );
   }
 }
-
-
-
-
 

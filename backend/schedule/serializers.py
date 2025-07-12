@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import WorkCategory, Schedule
+from site_app.models import Site
 from site_app.serializers import SiteSerializer
 from users.serializers import SimpleUserSerializer
 from django.utils import timezone as dj_tz
@@ -18,6 +19,11 @@ class WorkCategorySerializer(serializers.ModelSerializer):
 # スケジュール
 class ScheduleSerializer(serializers.ModelSerializer):
     site = SiteSerializer(read_only=True)
+    site_id = serializers.PrimaryKeyRelatedField(
+        queryset=Site.objects.all(),
+        source='site',
+        write_only=True
+    )
     members = serializers.SerializerMethodField()
     member_ids = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
@@ -37,7 +43,7 @@ class ScheduleSerializer(serializers.ModelSerializer):
         model = Schedule
         fields = (
             'id',
-            'site',
+            'site', 'site_id',
             'site_name',
             'start_time',
             'end_time',

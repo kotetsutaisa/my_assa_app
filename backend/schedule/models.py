@@ -96,6 +96,12 @@ class Schedule(models.Model):
         blank=True,
     )
 
+    teams = models.ManyToManyField(
+        "companies.Team",
+        related_name="schedules",
+        verbose_name=_("対象チーム")
+    )
+
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

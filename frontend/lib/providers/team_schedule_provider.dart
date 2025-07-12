@@ -1,22 +1,26 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:frontend/api/schedule_api.dart';
+import 'package:frontend/api/schedule_api.dart';          // ← チーム用 API もここに実装した前提
 import 'package:frontend/models/schedule_model.dart';
 import 'package:frontend/models/site_model.dart';
 import 'package:frontend/models/work_category_model.dart';
 import 'package:frontend/providers/dio_provider.dart';
 
-class MyPersonalScheduleMapNotifier
+/// チームスケジュール用  StateNotifier
+///
+/// * Personal 版との差分は **API の呼び出し先とペイロード** だけ  
+/// * “予定人員（memberIds）” などチーム特有パラメータは
+///   必要に応じてメソッド引数を拡張してください
+class TeamScheduleMapNotifier
     extends StateNotifier<AsyncValue<Map<DateTime, List<ScheduleModel>>>> {
   final Ref ref;
   DateTime? _lastStart;
   DateTime? _lastEnd;
 
-  MyPersonalScheduleMapNotifier(this.ref)
-      : super(const AsyncValue.loading());
+  TeamScheduleMapNotifier(this.ref) : super(const AsyncValue.loading());
 
-  // スケジュール取得
+  // ---------------- 取得 ----------------
   Future<void> fetch(DateTime start, DateTime end) async {
     try {
       _lastStart = start;
@@ -24,10 +28,11 @@ class MyPersonalScheduleMapNotifier
 
       state = const AsyncValue.loading();
       final dio = ref.read(dioProvider);
-      final schedules = await fetchMyMonthlySchedules(dio, start, end);
+
+      // 👇 Personal → Team 用 API へ置換
+      final schedules = await fetchTeamMonthlySchedules(dio, start, end);
 
       final map = <DateTime, List<ScheduleModel>>{};
-
       for (final s in schedules) {
         // 開始日の 00:00, 終了日の 00:00
         DateTime cur  = DateUtils.dateOnly(s.startTime.toLocal());
@@ -40,16 +45,17 @@ class MyPersonalScheduleMapNotifier
       }
 
       state = AsyncValue.data(map);
+
     } catch (e, st) {
-      print('❌ エラー: $e');
       state = AsyncValue.error(e, st);
     }
   }
 
-  // スケジュール作成
+  // ---------------- 作成 ----------------
   Future<void> addSchedule({
     required SiteModel selectedSite,
     required WorkCategoryModel selectedWorkCategory,
+    required List<String> memberIds,  // 👈 チーム用: 予定人員を追加
     required DateTime selectedStartDate,
     required DateTime startTime,
     required DateTime selectedEndDate,
@@ -59,10 +65,11 @@ class MyPersonalScheduleMapNotifier
     final dio = ref.read(dioProvider);
 
     try {
-      await createSchedule(
+      await createTeamSchedule(
         dio              : dio,
         selectedSite     : selectedSite,
         selectedWorkCategory: selectedWorkCategory,
+        memberIds        : memberIds,
         selectedStartDate: selectedStartDate,
         startTime        : startTime,
         selectedEndDate  : selectedEndDate,
@@ -70,9 +77,7 @@ class MyPersonalScheduleMapNotifier
         force            : force,      // ★
       );
     } on DioException catch (e) {
-      // 409 は上位(UI)で確認ダイアログ → 再呼び出し
       if (e.response?.statusCode == 409) rethrow;
-      // その他は state にエラー
       state = AsyncValue.error(e, StackTrace.current);
       return;
     } catch (e, st) {
@@ -80,7 +85,6 @@ class MyPersonalScheduleMapNotifier
       return;
     }
 
-    // --- 正常時は再 fetch でキャッシュ更新 ---
     final start = _lastStart ??
         DateTime(selectedStartDate.year, selectedStartDate.month, 1);
     final end   = _lastEnd ??
@@ -88,23 +92,22 @@ class MyPersonalScheduleMapNotifier
     await fetch(start, end);
   }
 
-  // スケジュール削除
+  // ---------------- 削除 ----------------
   Future<void> deleteSchedule(String scheduleId) async {
     try {
       final dio = ref.read(dioProvider);
+      await deleteTeamScheduleApi(dio, scheduleId);   // 👈 置換
 
-      await deleteScheduleApi(dio, scheduleId);
-
-      final cur = state.value ?? {};
+      // ローカルキャッシュを即時更新
+      final cur  = state.value ?? {};
       final next = <DateTime, List<ScheduleModel>>{};
-
-      cur.forEach((date, list) {
+      cur.forEach((d, list) {
         final filtered = list.where((s) => s.id != scheduleId).toList();
-        if (filtered.isNotEmpty) next[date] = filtered;
+        if (filtered.isNotEmpty) next[d] = filtered;
       });
-
       state = AsyncValue.data(next);
 
+      // バックエンドと再同期
       if (_lastStart != null && _lastEnd != null) {
         await fetch(_lastStart!, _lastEnd!);
       }
@@ -114,12 +117,12 @@ class MyPersonalScheduleMapNotifier
     }
   }
 
-
-  // スケジュール編集
+  // ---------------- 更新 ----------------
   Future<void> updateSchedule({
     required String id,
     required SiteModel selectedSite,
     required WorkCategoryModel selectedWorkCategory,
+    required List<String> memberIds,   // 👈 追加
     required DateTime selectedStartDate,
     required DateTime startTime,
     required DateTime selectedEndDate,
@@ -128,39 +131,40 @@ class MyPersonalScheduleMapNotifier
     try {
       final dio = ref.read(dioProvider);
 
-      Map<String, dynamic> payload = {
-        'site_id'            : selectedSite.id,
+      final payload = {
+        'site'            : selectedSite.id,
         'work_category_id': selectedWorkCategory.id,
+        'member_ids'      : memberIds,  // 👈 チーム用
         'start_time'      : _combine(selectedStartDate, startTime).toIso8601String(),
         'end_time'        : _combine(selectedEndDate, endTime).toIso8601String(),
       };
 
-      await updateScheduleApi(
-        dio: dio,
+      await updateTeamScheduleApi(     // 👈 置換
+        dio       : dio,
         scheduleId: id,
-        payload: payload
+        payload   : payload,
       );
 
       final start = _lastStart ??
           DateTime(selectedStartDate.year, selectedStartDate.month, 1);
       final end   = _lastEnd ??
           DateTime(selectedStartDate.year, selectedStartDate.month + 1, 0);
-
       await fetch(start, end);
 
     } catch (e, st) {
       state = AsyncValue.error(e, st);
-      rethrow; 
+      rethrow;
     }
   }
 
-  // 日付と時間の合併
+  // ---------------- util ----------------
   DateTime _combine(DateTime d, DateTime t) =>
       DateTime(d.year, d.month, d.day, t.hour, t.minute);
 }
 
-final myPersonalScheduleMapProvider = StateNotifierProvider<
-    MyPersonalScheduleMapNotifier,
+/// Provider 登録
+final teamScheduleMapProvider = StateNotifierProvider<
+    TeamScheduleMapNotifier,
     AsyncValue<Map<DateTime, List<ScheduleModel>>>>(
-  (ref) => MyPersonalScheduleMapNotifier(ref),
+  (ref) => TeamScheduleMapNotifier(ref),
 );

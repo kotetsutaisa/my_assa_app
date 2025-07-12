@@ -4,6 +4,7 @@ import 'package:frontend/models/site_model.dart';
 import 'package:frontend/models/work_category_model.dart';
 import 'package:frontend/providers/my_personal_schedule_provider.dart';
 import 'package:frontend/providers/work_category_provider.dart';
+import 'package:frontend/utils/add_schedule_helper.dart';
 import 'package:frontend/widgets/schedule_widget/date_dropdown_picker.dart';
 import 'package:frontend/widgets/schedule_widget/label_with_button_row.dart';
 import 'package:frontend/widgets/schedule_widget/label_with_widget_row.dart';
@@ -13,7 +14,10 @@ import 'package:frontend/widgets/schedule_widget/work_selector_model.dart';
 import 'package:intl/intl.dart';
 
 class CreateSchedulePage extends ConsumerStatefulWidget {
-  const CreateSchedulePage({super.key});
+  /// カレンダーでタップした日。指定が無ければ「今日」
+  final DateTime initialDate;
+  CreateSchedulePage({super.key, DateTime? initialDate})
+    : initialDate = initialDate ?? DateTime.now();
 
   @override
   ConsumerState<CreateSchedulePage> createState() => _CreateSchedulePage();
@@ -22,24 +26,26 @@ class CreateSchedulePage extends ConsumerStatefulWidget {
 class _CreateSchedulePage extends ConsumerState<CreateSchedulePage> {
   SiteModel? _selectedSite;
   WorkCategoryModel? _selectedWorkCategory;
-  DateTime _selectedStartDate = DateTime.now();
-  DateTime _selectedEndDate = DateTime.now();
+  
+  late DateTime _selectedStartDate;
+  late DateTime _selectedEndDate;
+  late DateTime _startTime;
+  late DateTime _endTime;
 
-  DateTime _startTime = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-    DateTime.now().day,
-    8,  // ← 8時
-    0,  // 分
-  );
+  @override
+  void initState() {
+    super.initState();
 
-  DateTime _endTime = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-    DateTime.now().day,
-    17,
-    0,
-  );
+    // カレンダーで選んだ日（＝ widget.initialDate）を使う
+    final d = widget.initialDate;
+
+    _selectedStartDate = d;
+    _selectedEndDate   = d;
+
+    // 8:00 – 17:00 も同じ日付で初期化
+    _startTime = DateTime(d.year, d.month, d.day, 8);
+    _endTime   = DateTime(d.year, d.month, d.day, 17);
+  }
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context)
@@ -100,13 +106,19 @@ class _CreateSchedulePage extends ConsumerState<CreateSchedulePage> {
                 }
 
                 // ---------- 追加 API 呼び出し（StateNotifier 経由） ----------
-                await ref.read(myPersonalScheduleMapProvider.notifier).addSchedule(
-                  selectedSite        : _selectedSite!,
-                  selectedWorkCategory: _selectedWorkCategory!,
-                  selectedStartDate   : _selectedStartDate,
-                  startTime           : _startTime,
-                  selectedEndDate     : _selectedEndDate,
-                  endTime             : _endTime,
+                await addScheduleWithConfirm(
+                  context: context,
+                  request: ({bool force = false}) async {
+                    await ref.read(myPersonalScheduleMapProvider.notifier).addSchedule(
+                      selectedSite        : _selectedSite!,
+                      selectedWorkCategory: _selectedWorkCategory!,
+                      selectedStartDate   : _selectedStartDate,
+                      startTime           : _startTime,
+                      selectedEndDate     : _selectedEndDate,
+                      endTime             : _endTime,
+                      force               : force,
+                    );
+                  },
                 );
 
                 if (mounted) Navigator.pop(context);          // 登録成功 → 画面を閉じる
