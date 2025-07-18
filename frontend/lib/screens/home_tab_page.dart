@@ -5,7 +5,7 @@ import 'package:frontend/screens/company/company_page.dart';
 import 'package:frontend/screens/invitation_page.dart';
 import 'package:frontend/screens/new_work_page.dart';
 import 'package:frontend/screens/site/site_list_page.dart';
-import 'package:frontend/screens/track_page.dart';
+import 'package:frontend/screens/track/track_page.dart';
 import 'package:frontend/utils/constants.dart';
 import 'package:frontend/widgets/column_button.dart';
 import '../providers/user_provider.dart';
@@ -131,7 +131,7 @@ class _HomeTabPageState extends ConsumerState<HomeTabPage> {
                 ),
                 ColumnButton(
                   iconPath: 'assets/icons/track.svg',
-                  label: '搬入・搬出',
+                  label: '車両',
                   onTap: () => ref.read(currentPageProvider.notifier).state = const TrackPage(),
                 ),
                 ColumnButton(

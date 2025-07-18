@@ -1,10 +1,11 @@
 from rest_framework import serializers
-from .models import WorkCategory, Schedule
+from .models import WorkCategory, Schedule, ScheduleType
 from site_app.models import Site
 from site_app.serializers import SiteSerializer
 from users.serializers import SimpleUserSerializer
 from django.utils import timezone as dj_tz
 from django.contrib.auth import get_user_model
+from resources.models import Resource
 
 User = get_user_model()
 
@@ -39,21 +40,44 @@ class ScheduleSerializer(serializers.ModelSerializer):
     )
     site_name = serializers.CharField(source='site.name', read_only=True)
 
+    resource_id = serializers.PrimaryKeyRelatedField(
+        queryset=Resource.objects.none(),
+        source='resource',
+        allow_null=True,
+        required=False,
+        write_only = True,
+    )
+    resource = serializers.StringRelatedField(read_only=True)
+
     class Meta:
         model = Schedule
         fields = (
             'id',
-            'site', 'site_id',
-            'site_name',
-            'start_time',
-            'end_time',
-            'schedule_type',
-            'work_category',
-            'work_category_id',
-            'members',
-            'member_ids',
+            # -- FK --
+            'site', 'site_id', 'site_name',
+            'work_category', 'work_category_id',
+            'resource', 'resource_id',
+            # -- core --
+            'start_time', 'end_time', 'schedule_type',
+            # -- members --
+            'members', 'member_ids',
+            # -- meta --
             'created_at',
         )
+
+    def __init__(self, *args, **kwargs):
+        """
+        リクエストユーザーの company に属するオブジェクトだけ
+        PrimaryKeyRelatedField の queryset に流し込む
+        """
+        super().__init__(*args, **kwargs)
+        user = self.context["request"].user
+        company = getattr(user, "company", None)
+
+        if company:
+            self.fields["site_id"].queryset          = Site.objects.filter(company=company)
+            self.fields["work_category_id"].queryset = WorkCategory.objects.filter(company=company)
+            self.fields["resource_id"].queryset      = Resource.objects.filter(company=company)
 
     def get_members(self, obj):
         return SimpleUserSerializer(obj.members.all(), many=True).data
@@ -89,10 +113,10 @@ class ScheduleSerializer(serializers.ModelSerializer):
         return instance
 
     def validate(self, data):
-        start = data.get("start_time")
-        end   = data.get("end_time")
+        start = data.get("start_time") or getattr(self.instance, "start_time", None)
+        end   = data.get("end_time")   or getattr(self.instance, "end_time",   None)
 
-        # ナイーブなら既定タイムゾーン付きに変換
+        # aware にそろえる
         if start and dj_tz.is_naive(start):
             start = dj_tz.make_aware(start, dj_tz.get_default_timezone())
             data["start_time"] = start
@@ -102,4 +126,11 @@ class ScheduleSerializer(serializers.ModelSerializer):
 
         if start and end and start >= end:
             raise serializers.ValidationError("終了日時は開始日時より後にしてください。")
+
+        # リソース予定なら resource は必須
+        schedule_type = data.get("schedule_type") or getattr(self.instance, "schedule_type", None)
+        resource      = data.get("resource")      or getattr(self.instance, "resource", None)
+        if schedule_type == ScheduleType.RESOURCE and resource is None:
+            raise serializers.ValidationError({"resource_id": "リソース予定では resource_id が必須です。"})
+
         return data

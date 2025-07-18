@@ -65,6 +65,14 @@ class Schedule(models.Model):
         verbose_name=_("現場"),
     )
 
+    resource = models.ForeignKey(
+        "resources.Resource",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="schedules",
+        verbose_name=_("対象リソース"),
+    )
+
     start_time = models.DateTimeField(
         verbose_name=_("開始日時"),
     )

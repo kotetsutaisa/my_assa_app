@@ -37,6 +37,7 @@ urlpatterns = [
     path('api/chat/', include('chat.urls')),
     path('api/sites/', include('site_app.urls')),
     path('api/schedule/', include('schedule.urls')),
+    path('api/resources/', include('resources.urls')),
 ]
 
 if settings.DEBUG:

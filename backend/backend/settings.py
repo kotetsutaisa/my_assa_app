@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'chat',
     'site_app',
     'schedule',
+    'resources',
 ]
 
 MIDDLEWARE = [
