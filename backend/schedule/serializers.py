@@ -6,6 +6,8 @@ from users.serializers import SimpleUserSerializer
 from django.utils import timezone as dj_tz
 from django.contrib.auth import get_user_model
 from resources.models import Resource
+from companies.models import Team
+from resources.serializers import ResourceSerializer
 
 User = get_user_model()
 
@@ -34,9 +36,11 @@ class ScheduleSerializer(serializers.ModelSerializer):
     )
     work_category = WorkCategorySerializer(read_only=True)
     work_category_id = serializers.PrimaryKeyRelatedField(
-        queryset=WorkCategory.objects.all(),
+        queryset=WorkCategory.objects.none(),
         source='work_category',
-        write_only=True
+        write_only=True,
+        required=False,
+        allow_null=True,
     )
     site_name = serializers.CharField(source='site.name', read_only=True)
 
@@ -47,7 +51,16 @@ class ScheduleSerializer(serializers.ModelSerializer):
         required=False,
         write_only = True,
     )
-    resource = serializers.StringRelatedField(read_only=True)
+    resource    = ResourceSerializer(read_only=True)
+
+    teams = serializers.SerializerMethodField()
+    team_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Team.objects.none(),  # __init__ で company 絞る
+        write_only=True,
+        required=False,
+        source='teams'
+    )
 
     class Meta:
         model = Schedule
@@ -61,6 +74,7 @@ class ScheduleSerializer(serializers.ModelSerializer):
             'start_time', 'end_time', 'schedule_type',
             # -- members --
             'members', 'member_ids',
+            'teams','team_ids',
             # -- meta --
             'created_at',
         )
@@ -78,13 +92,19 @@ class ScheduleSerializer(serializers.ModelSerializer):
             self.fields["site_id"].queryset          = Site.objects.filter(company=company)
             self.fields["work_category_id"].queryset = WorkCategory.objects.filter(company=company)
             self.fields["resource_id"].queryset      = Resource.objects.filter(company=company)
+            self.fields['team_ids'].queryset         = Team.objects.filter(company=company)
 
     def get_members(self, obj):
         return SimpleUserSerializer(obj.members.all(), many=True).data
+    
+    def get_teams(self, obj):
+        # 必要な最小情報だけ返す
+        return [{'id': t.id, 'name': t.name} for t in obj.teams.all()]
 
     def create(self, validated_data):
         members = validated_data.pop('member_ids', [])
         user = self.context['request'].user
+        teams   = validated_data.pop('teams', [])
 
         if validated_data.get("schedule_type") == "personal" and not members:
             members = [user]
@@ -93,11 +113,22 @@ class ScheduleSerializer(serializers.ModelSerializer):
         validated_data['created_by'] = user
 
         schedule = Schedule.objects.create(**validated_data)
-        schedule.members.set(members)
+        if members:
+            schedule.members.set(members)
+        # team schedule ならチーム必須にしたい場合はここでチェック
+        if schedule.schedule_type == ScheduleType.TEAM:
+            if not teams:
+                # 自動推論: 参加メンバーが所属するチーム全部を付与
+                teams = (Team.objects
+                         .filter(members__user__in=schedule.members.all(),
+                                 members__is_active=True)
+                         .distinct())
+            schedule.teams.set(teams)
         return schedule
 
     def update(self, instance, validated_data):
         members = validated_data.pop('member_ids', serializers.empty)
+        teams   = validated_data.pop('teams', serializers.empty)
 
         # company / created_by を変更不能に
         validated_data.pop('company', None)
@@ -110,9 +141,13 @@ class ScheduleSerializer(serializers.ModelSerializer):
         if members is not serializers.empty:      # ← キーが来た時だけ更新
             instance.members.set(members)
 
+        if teams is not serializers.empty:
+            instance.teams.set(teams)
+
         return instance
 
     def validate(self, data):
+
         start = data.get("start_time") or getattr(self.instance, "start_time", None)
         end   = data.get("end_time")   or getattr(self.instance, "end_time",   None)
 

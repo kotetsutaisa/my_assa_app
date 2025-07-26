@@ -1,58 +1,62 @@
-/// lib/screens/schedule/edit_team_schedule_page.dart
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:frontend/models/schedule_model.dart';
 import 'package:frontend/models/site_model.dart';
-import 'package:frontend/models/team_info_model.dart';
-import 'package:frontend/models/work_category_model.dart';
-import 'package:frontend/models/member_model.dart';
-import 'package:frontend/providers/team_member_provider.dart';
-import 'package:frontend/providers/team_schedule_provider.dart';
-import 'package:frontend/providers/work_category_provider.dart';
+import 'package:frontend/models/member_model.dart';                 // 運転手 = 既存 MemberModel を流用
+import 'package:frontend/providers/team_member_provider.dart';      // 運転手一覧取得に流用
+import 'package:frontend/providers/resource_schedule_provider.dart';// ★ 変更: リソース用 StateNotifier
 import 'package:frontend/utils/constants.dart';
-import 'package:frontend/widgets/common/avatar.dart';
 import 'package:frontend/widgets/schedule_widget/date_dropdown_picker.dart';
 import 'package:frontend/widgets/schedule_widget/label_with_button_row.dart';
 import 'package:frontend/widgets/schedule_widget/label_with_widget_row.dart';
 import 'package:frontend/widgets/schedule_widget/site_selector_modal.dart';
 import 'package:frontend/widgets/schedule_widget/time_picker_modal.dart';
-import 'package:frontend/widgets/schedule_widget/work_selector_model.dart';
 import 'package:intl/intl.dart';
 
-class EditTeamSchedulePage extends ConsumerStatefulWidget {
+/// ★ 変更: リソーススケジュール編集ページ
+class EditResourceSchedulePage extends ConsumerStatefulWidget {
   final ScheduleModel schedule;
-  const EditTeamSchedulePage({super.key, required this.schedule});
+  const EditResourceSchedulePage({super.key, required this.schedule});
 
   @override
-  ConsumerState<EditTeamSchedulePage> createState() => _EditTeamSchedulePage();
+  ConsumerState<EditResourceSchedulePage> createState() => _EditResourceSchedulePageState();
 }
 
-class _EditTeamSchedulePage extends ConsumerState<EditTeamSchedulePage> {
+class _EditResourceSchedulePageState extends ConsumerState<EditResourceSchedulePage> {
   /* ── 選択中データ ── */
-  late SiteModel?         _selectedSite;
-  late WorkCategoryModel? _selectedWorkCategory;
-  late final _selectedMembers = <MemberModel>[];
+  late SiteModel? _selectedSite;
+  // ★ 削除: WorkCategory は不要
+  late final _selectedDrivers = <MemberModel>[]; // ★ 変更: メンバー → 運転手
 
   late DateTime _selectedStartDate;
   late DateTime _selectedEndDate;
   late DateTime _startTime;
   late DateTime _endTime;
-  late List<TeamInfo> _originalTeams;
+
+  late final String _resourceId;              // ★ 追加: family Provider のキー用
+  late final String _resourceName;            // ★ 追加: タイトル表示用
 
   @override
   void initState() {
     super.initState();
     final sch = widget.schedule;
-    _selectedSite         = sch.site;
-    _selectedWorkCategory = sch.workCategory;
-    _selectedStartDate    = sch.startTime;
-    _selectedEndDate      = sch.endTime;
-    _startTime            = sch.startTime;
-    _endTime              = sch.endTime;
-    /* 既存メンバーを初期セット（SimpleUserModel → MemberModel 変換は適宜） */
-    _selectedMembers.addAll(sch.members.map((u) =>
-        MemberModel(id: u.id.toString(), name: u.username, avatarUrl: u.iconimg)));
-    _originalTeams = sch.teams;
+
+    // ★ リソース情報取得（ScheduleModel 側の名前に合わせて適宜修正）
+    _resourceId   = sch.resource?.id ?? '';     // resourceId プロパティ前提
+    _resourceName = sch.resource?.name ?? '';   // resourceName が無ければ表示を工夫
+
+    _selectedSite      = sch.site;
+    _selectedStartDate = sch.startTime;
+    _selectedEndDate   = sch.endTime;
+    _startTime         = sch.startTime;
+    _endTime           = sch.endTime;
+
+    // ★ 運転手初期化（SimpleUserModel → MemberModel）
+    _selectedDrivers.addAll(
+      sch.members.map((u) => MemberModel(id: u.id.toString(), name: u.username, avatarUrl: u.iconimg)),
+    );
   }
 
   /* ── 共通 util ── */
@@ -66,9 +70,9 @@ class _EditTeamSchedulePage extends ConsumerState<EditTeamSchedulePage> {
     return '$base$path';
   }
 
-  /* ── メンバー選択モーダル ── */
-  Future<void> _showMemberSelector() async {
-    final allMembers = await ref.read(teamMemberListProvider.future);
+  /* ── 運転手選択モーダル ── */
+  Future<void> _showDriverSelector() async {
+    final all = await ref.read(teamMemberListProvider.future); // 既存流用
 
     final result = await showModalBottomSheet<List<MemberModel>>(
       context: context,
@@ -78,7 +82,7 @@ class _EditTeamSchedulePage extends ConsumerState<EditTeamSchedulePage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        final temp = [..._selectedMembers];
+        final temp = [..._selectedDrivers];
         return StatefulBuilder(builder: (ctx, setModal) {
           return Padding(
             padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
@@ -93,28 +97,34 @@ class _EditTeamSchedulePage extends ConsumerState<EditTeamSchedulePage> {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                Text('メンバーを選択', style: Theme.of(ctx).textTheme.titleMedium),
+                Text('運転手を選択', style: Theme.of(ctx).textTheme.titleMedium), // ★ 変更
                 const Divider(),
                 SizedBox(
                   height: 360,
                   child: ListView.builder(
-                    itemCount: allMembers.length,
+                    itemCount: all.length,
                     itemBuilder: (_, i) {
-                      final m = allMembers[i];
-                      final checked = temp.any((e) => e.id == m.id);
+                      final m = all[i];
+                      final checked    = temp.any((e) => e.id == m.id);
+                      final hasAvatar  = m.avatarUrl?.isNotEmpty ?? false;
+
                       return CheckboxListTile(
-                        secondary: buildAvatar(
-                          context: context,
-                          imageUrl: m.avatarUrl,
+                        secondary: CircleAvatar(
                           radius: 18,
-                          resolveUrl: _resolveImageUrl, // 不要なら省略
+                          backgroundImage: hasAvatar
+                              ? CachedNetworkImageProvider(_resolveImageUrl(m.avatarUrl!))
+                              : null,
+                          backgroundColor: hasAvatar
+                              ? null
+                              : Theme.of(context).colorScheme.primary,
+                          child: hasAvatar
+                              ? null
+                              : const Icon(Icons.person, color: Colors.white, size: 18),
                         ),
                         title: Text(m.name),
                         value: checked,
                         onChanged: (v) => setModal(() {
-                          v == true
-                              ? temp.add(m)
-                              : temp.removeWhere((e) => e.id == m.id);
+                          v == true ? temp.add(m) : temp.removeWhere((e) => e.id == m.id);
                         }),
                       );
                     },
@@ -135,7 +145,7 @@ class _EditTeamSchedulePage extends ConsumerState<EditTeamSchedulePage> {
     );
 
     if (result != null) setState(() {
-      _selectedMembers
+      _selectedDrivers
         ..clear()
         ..addAll(result);
     });
@@ -144,14 +154,12 @@ class _EditTeamSchedulePage extends ConsumerState<EditTeamSchedulePage> {
   /* ── build ── */
   @override
   Widget build(BuildContext context) {
-    final memberLabel = _selectedMembers.isEmpty
-        ? 'メンバーを選択'
-        : '${_selectedMembers.length}名';
+    final driverLabel = _selectedDrivers.isEmpty ? '運転手を選択' : '${_selectedDrivers.length}名';
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title : Text('編集', style: Theme.of(context).textTheme.titleLarge),
+        title : Text('${_resourceName} 予定編集', style: Theme.of(context).textTheme.titleLarge), // ★ 変更
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: Theme.of(context).colorScheme.outline),
@@ -172,6 +180,15 @@ class _EditTeamSchedulePage extends ConsumerState<EditTeamSchedulePage> {
             children: [
               /* ── 上段カード ── */
               _InfoCard(children: [
+                // ▼ リソース表示（編集不可）
+                LabelWithButtonRow(
+                  label: 'リソース',
+                  value: _resourceName.isEmpty ? 'リソース' : _resourceName,
+                  onTap : () {},                              // ★ 変更: ダミーで空関数
+                ),
+                const Divider(),
+
+                // ▼ 現場選択（必須）
                 LabelWithButtonRow(
                   label: '現場',
                   value: _selectedSite?.name ?? widget.schedule.siteName,
@@ -181,53 +198,49 @@ class _EditTeamSchedulePage extends ConsumerState<EditTeamSchedulePage> {
                   ),
                 ),
                 const Divider(),
+
+                // ▼ 運転手選択
                 LabelWithButtonRow(
-                  label: '作業内容',
-                  value: _selectedWorkCategory?.name ?? widget.schedule.workCategory?.name ?? '',
-                  onTap : () async {
-                    await showWorkSelectorModal(
-                      context: context,
-                      onSelected: (w) => setState(() => _selectedWorkCategory = w),
-                    );
-                    final list = ref.read(workCategoryListProvider).value ?? [];
-                    if (!list.any((w) => w.id == _selectedWorkCategory?.id)) {
-                      setState(() => _selectedWorkCategory = null);
-                    }
-                  },
+                  label: '運転手',
+                  value: driverLabel,
+                  onTap : _showDriverSelector,
                 ),
-                const Divider(),
-                LabelWithButtonRow(
-                  label: 'メンバー',
-                  value: memberLabel,
-                  onTap : _showMemberSelector,
-                ),
-                if (_selectedMembers.isNotEmpty) ...[
+                if (_selectedDrivers.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 12,
                     runSpacing: 16,
-                    children: _selectedMembers.map((m) => Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        buildAvatar(
-                          context: context,
-                          imageUrl: m.avatarUrl,
-                          radius: 20,
-                          resolveUrl: _resolveImageUrl,
-                        ),
-                        const SizedBox(height: 4),
-                        SizedBox(
-                          width: 48,
-                          child: Text(
-                            m.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall,
+                    children: _selectedDrivers.map((m) {
+                      final hasAvatar = (m.avatarUrl?.isNotEmpty ?? false);
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: hasAvatar ? null : Theme.of(context).colorScheme.primary,
+                            backgroundImage: hasAvatar
+                                ? CachedNetworkImageProvider(_resolveImageUrl(m.avatarUrl!))
+                                : null,
+                            child: hasAvatar
+                                ? null
+                                : Icon(Icons.person,
+                                    color: Colors.white,
+                                    size: 20),
                           ),
-                        ),
-                      ],
-                    )).toList(),
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            width: 48,
+                            child: Text(
+                              m.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
                   ),
                 ],
               ]),
@@ -275,27 +288,23 @@ class _EditTeamSchedulePage extends ConsumerState<EditTeamSchedulePage> {
 
   /* ── 保存処理 ── */
   Future<void> _save() async {
-    if (_selectedSite == null)          return _showError('現場は必須です');
-    if (_selectedWorkCategory == null)  return _showError('作業内容は必須です');
-    if (_selectedMembers.isEmpty)       return _showError('メンバーを選択してください');
+    if (_selectedSite == null) return _showError('現場は必須です');   // ★ 変更: 作業内容チェック削除
 
     final start = DateTime(_selectedStartDate.year, _selectedStartDate.month, _selectedStartDate.day,
                            _startTime.hour, _startTime.minute);
-    final end   = DateTime(_selectedEndDate.year,   _selectedEndDate.month,   _selectedEndDate.day,
-                           _endTime.hour,   _endTime.minute);
+    final end   = DateTime(_selectedEndDate.year, _selectedEndDate.month, _selectedEndDate.day,
+                           _endTime.hour, _endTime.minute);
     if (!end.isAfter(start)) return _showError('終了日時は開始日時より後にしてください');
 
     try {
-      await ref.read(teamScheduleMapProvider.notifier).updateSchedule(
-        id                  : widget.schedule.id,
-        selectedSite        : _selectedSite!,
-        selectedWorkCategory: _selectedWorkCategory!,
-        memberIds           : _selectedMembers.map((e) => e.id).toList(), // ★ 追加
-        teamIds             : _originalTeams.map((t) => t.id).toList(),
-        selectedStartDate   : _selectedStartDate,
-        startTime           : _startTime,
-        selectedEndDate     : _selectedEndDate,
-        endTime             : _endTime,
+      await ref.read(resourceScheduleMapProvider(_resourceId).notifier).updateSchedule(
+        id                : widget.schedule.id,
+        selectedSite      : _selectedSite!,
+        memberIds         : _selectedDrivers.map((e) => e.id).toList(), // ★ 変更: 運転手ID
+        selectedStartDate : _selectedStartDate,
+        startTime         : _startTime,
+        selectedEndDate   : _selectedEndDate,
+        endTime           : _endTime,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {

@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 class LabelWithButtonRow extends StatelessWidget {
   final String label;
   final String value;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const LabelWithButtonRow({
     super.key,
     required this.label,
     required this.value,
-    required this.onTap,
+    this.onTap,
   });
 
   @override

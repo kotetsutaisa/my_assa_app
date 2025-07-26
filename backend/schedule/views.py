@@ -152,6 +152,7 @@ class TeamMonthlyScheduleAPIView(OverlapSafeCreateMixin, generics.ListCreateAPIV
     """
     GET  /api/schedule/team-monthly/?start=2025-07-01T00:00:00Z&end=2025-07-31T23:59:59Z
     POST /api/schedule/team-monthly/
+      - POST は OverlapSafeCreateMixin により重複整理ロジック適用
     """
     serializer_class   = ScheduleSerializer
     permission_classes = [permissions.IsAuthenticated, IsCompanyMember]
@@ -160,27 +161,112 @@ class TeamMonthlyScheduleAPIView(OverlapSafeCreateMixin, generics.ListCreateAPIV
     def get_queryset(self):
         user = self.request.user
 
-        my_team_ids = (
-            TeamMember.objects
-            .filter(user=user, is_active=True)
-            .values_list("team_id", flat=True)
-        )
+        # ユーザーが “アクティブで所属するチーム” の ID 一覧
+        my_team_ids = TeamMember.objects.filter(
+            user=user,
+            is_active=True
+        ).values_list("team_id", flat=True)
 
         qs = (
             Schedule.objects
             .filter(
                 company=user.company,
                 schedule_type=ScheduleType.TEAM,
-                teams__in     = Subquery(my_team_ids)
+                teams__in=my_team_ids,          # 自分が所属するチームに紐づく予定のみ
             )
+            .select_related("site", "work_category", "resource")
+            .prefetch_related("members", "teams")
             .distinct()
-            .select_related("site", "work_category")
+        )
+
+        # 期間フィルタ（交差条件）
+        start_param = self.request.query_params.get("start")
+        end_param   = self.request.query_params.get("end")
+        if start_param and end_param:
+            start = parse_datetime(start_param)
+            end   = parse_datetime(end_param)
+            if start and end:
+                if dj_tz.is_naive(start):
+                    start = dj_tz.make_aware(start, dj_tz.get_default_timezone())
+                if dj_tz.is_naive(end):
+                    end = dj_tz.make_aware(end, dj_tz.get_default_timezone())
+                qs = qs.filter(
+                    start_time__lt=end,    # 予定開始 < 期間の終端
+                    end_time__gt=start,    # 予定終了 > 期間の開始
+                )
+
+        return qs.order_by("start_time")
+
+    # ---- 重複判定用 (POST) ----
+    def get_overlap_queryset(self):
+        """
+        重複チェックでは schedule_type を限定せず、
+        同一 company 内の全予定（personal / team / resource）を対象にする。
+        """
+        user = self.request.user
+        return (
+            Schedule.objects
+            .filter(company=user.company)
+            .select_related("site", "work_category", "resource")
             .prefetch_related("members", "teams")
         )
 
+    # ---- 作成 ----
+    def perform_create(self, serializer):
+        """
+        schedule_type を強制的に TEAM として保存。
+        team_ids / member_ids の処理は serializer 側で行う前提。
+        （team_ids を View で扱いたい場合はコメントを参照）
+        """
+        user = self.request.user
+
+        # もし View 側で team_ids を拾ってバリデーションしたい場合:
+        # team_ids = self.request.data.get("team_ids", [])
+        # if not team_ids:
+        #     raise ValidationError({"team_ids": "チームを1つ以上指定してください。"})
+
+        schedule = serializer.save(
+            company=user.company,
+            created_by=user,
+            schedule_type=ScheduleType.TEAM,
+        )
+
+        # members が空なら作成者を補完（運用ポリシーに応じて）
+        if schedule.members.count() == 0:
+            schedule.members.add(user)
+
+
+# リソーススケジュール
+class ResourceMonthlyScheduleAPIView(OverlapSafeCreateMixin, generics.ListCreateAPIView):
+    """
+    GET  /api/schedule/resource-monthly/?start=...&end=...&resource_id=<uuid>
+    POST /api/schedule/resource-monthly/[?force=true]
+    """
+    serializer_class   = ScheduleSerializer
+    permission_classes = [permissions.IsAuthenticated, IsCompanyMember]
+
+    # --------- 取得 ---------
+    def get_queryset(self):
+        user = self.request.user
+
+        qs = (
+            Schedule.objects
+            .filter(
+                company=user.company,
+                schedule_type=ScheduleType.RESOURCE,
+            )
+            .select_related("site", "work_category", "resource")
+            .prefetch_related("members", "teams")
+        )
+
+        # リソースで絞る（任意）
+        res_id = self.request.query_params.get("resource_id")
+        if res_id:
+            qs = qs.filter(resource_id=res_id)
+
+        # 期間指定（交差判定）
         start_param = self.request.query_params.get("start")
         end_param   = self.request.query_params.get("end")
-
         if start_param and end_param:
             start = parse_datetime(start_param)
             end   = parse_datetime(end_param)
@@ -190,47 +276,37 @@ class TeamMonthlyScheduleAPIView(OverlapSafeCreateMixin, generics.ListCreateAPIV
                 if dj_tz.is_naive(end):
                     end   = dj_tz.make_aware(end, dj_tz.get_default_timezone())
                 qs = qs.filter(
-                    start_time__lt=end,   #   予定開始 < 期間終端
-                    end_time__gt=start,   # & 予定終了 > 期間開始
+                    start_time__lt=end,   # 予定開始 < 期間終端
+                    end_time__gt=start,   # 予定終了 > 期間開始
                 )
 
         return qs.order_by("start_time")
-    
 
-    # ---------- 重複判定用 (POST) ----------
+    # --------- 重複判定用クエリセット (POST 時) ---------
     def get_overlap_queryset(self):
         """
-        POST 時はこちらを使う → company 内の全スケジュール
-        (schedule_type で絞らない)
+        create() 内で Mixin が呼ぶ。
+        RESOURCE の衝突判定には会社内の全スケジュールを対象にする。
         """
         user = self.request.user
         return (
             Schedule.objects
             .filter(company=user.company)
-            .select_related("site", "work_category")
-            .prefetch_related("members")
+            .select_related("site", "work_category", "resource")
+            .prefetch_related("members", "teams")
         )
 
-
-
-    # ---- 作成 ----
+    # --------- 作成 ---------
     def perform_create(self, serializer):
         """
-        - schedule_type を TEAM に固定
-        - members が空なら作成者を必ず含める
+        schedule_type を RESOURCE に固定し、
+        company / created_by を付与して保存。
         """
         user = self.request.user
-        team_ids = self.request.data.get('team_ids', [])
-
-        # schedule_type を強制的にチームに
         schedule = serializer.save(
             company       = user.company,
             created_by    = user,
-            schedule_type = ScheduleType.TEAM,           # ★ ここが重要
+            schedule_type = ScheduleType.RESOURCE,
         )
-
-        if team_ids:
-            schedule.teams.set(team_ids)
-
-        if schedule.members.count() == 0:
-            schedule.members.add(user)
+        # members は任意。必要ならここで初期値を突っ込む処理を入れる
+        return schedule

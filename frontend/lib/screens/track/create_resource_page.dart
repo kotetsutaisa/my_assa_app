@@ -1,41 +1,39 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/models/resource_model.dart';
 import 'package:frontend/models/site_model.dart';
-import 'package:frontend/models/work_category_model.dart';
 import 'package:frontend/models/member_model.dart';               // ★ メンバーモデル
+import 'package:frontend/providers/resource_schedule_provider.dart';
 import 'package:frontend/providers/team_member_provider.dart';    // ★ 一覧取得プロバイダー
-import 'package:frontend/providers/team_schedule_provider.dart';
-import 'package:frontend/providers/work_category_provider.dart';
 import 'package:frontend/utils/add_schedule_helper.dart';
 import 'package:frontend/utils/constants.dart';
-import 'package:frontend/widgets/common/avatar.dart';
 
 import 'package:frontend/widgets/schedule_widget/date_dropdown_picker.dart';
 import 'package:frontend/widgets/schedule_widget/label_with_button_row.dart';
 import 'package:frontend/widgets/schedule_widget/label_with_widget_row.dart';
 import 'package:frontend/widgets/schedule_widget/site_selector_modal.dart';
 import 'package:frontend/widgets/schedule_widget/time_picker_modal.dart';
-import 'package:frontend/widgets/schedule_widget/work_selector_model.dart';
 
 import 'package:intl/intl.dart';
 
 
-class CreateTeamSchedulePage extends ConsumerStatefulWidget {
+class CreateResourceSchedulePage extends ConsumerStatefulWidget {
   
+  final ResourceModel resource;
   /// カレンダーでタップした日。指定が無ければ「今日」
   final DateTime initialDate;
-  CreateTeamSchedulePage({super.key, DateTime? initialDate})
+  CreateResourceSchedulePage({super.key, required this.resource, DateTime? initialDate})
     : initialDate = initialDate ?? DateTime.now();
 
   @override
-  ConsumerState<CreateTeamSchedulePage> createState() => _CreateTeamSchedulePage();
+  ConsumerState<CreateResourceSchedulePage> createState() => _CreateResourceSchedulePage();
 }
 
-class _CreateTeamSchedulePage extends ConsumerState<CreateTeamSchedulePage> {
+class _CreateResourceSchedulePage extends ConsumerState<CreateResourceSchedulePage> {
   /* ─── 選択中データ ─── */
   SiteModel?             _selectedSite;
-  WorkCategoryModel?     _selectedWorkCategory;
-  final _selectedMembers = <MemberModel>[];
+  final _selectedDrivers = <MemberModel>[];
 
   // DateTime _selectedStartDate = DateTime.now();
   // DateTime _selectedEndDate   = DateTime.now();
@@ -86,7 +84,7 @@ class _CreateTeamSchedulePage extends ConsumerState<CreateTeamSchedulePage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        final temp = [..._selectedMembers];              // 選択状態をモーダル内で複製
+        final temp = [..._selectedDrivers];              // 選択状態をモーダル内で複製
         return StatefulBuilder(builder: (ctx, setStateModal) {
           return Padding(
             padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
@@ -101,7 +99,7 @@ class _CreateTeamSchedulePage extends ConsumerState<CreateTeamSchedulePage> {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                Text('メンバーを選択', style: Theme.of(ctx).textTheme.titleMedium),
+                Text('運転手を選択', style: Theme.of(ctx).textTheme.titleMedium),
                 const Divider(),
                 SizedBox(
                   height: 360,
@@ -111,11 +109,15 @@ class _CreateTeamSchedulePage extends ConsumerState<CreateTeamSchedulePage> {
                       final m = allMembers[i];
                       final checked = temp.any((e) => e.id == m.id);
 
-                      final avatar = buildAvatar(
-                        context: context,
-                        imageUrl: m.avatarUrl,
+                      final avatar = CircleAvatar(
                         radius: 18,
-                        resolveUrl: resolveImageUrl, // 不要なら省略
+                        backgroundImage: (m.avatarUrl != null && m.avatarUrl!.isNotEmpty)
+                            ? CachedNetworkImageProvider(resolveImageUrl(m.avatarUrl!))
+                            : null,
+                        child: (m.avatarUrl == null || m.avatarUrl!.isEmpty)
+                            ? Text(m.name.characters.first,
+                                style: const TextStyle(color: Colors.white))
+                            : null,
                       );
 
                       return CheckboxListTile(
@@ -143,7 +145,7 @@ class _CreateTeamSchedulePage extends ConsumerState<CreateTeamSchedulePage> {
       },
     );
 
-    if (result != null) setState(() { _selectedMembers
+    if (result != null) setState(() { _selectedDrivers
       ..clear()
       ..addAll(result);
     });
@@ -152,14 +154,15 @@ class _CreateTeamSchedulePage extends ConsumerState<CreateTeamSchedulePage> {
   /* ─── build ─── */
   @override
   Widget build(BuildContext context) {
-    final memberLabel = _selectedMembers.isEmpty
+    final memberLabel = _selectedDrivers.isEmpty
         ? 'メンバーを選択'
-        : '${_selectedMembers.length}名';
+        : '${_selectedDrivers.length}名';
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: Text('チーム予定', style: Theme.of(context).textTheme.titleLarge),
+        title: Text('${widget.resource.name} 予定',
+          style: Theme.of(context).textTheme.titleLarge),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: Theme.of(context).colorScheme.outline),
@@ -170,8 +173,6 @@ class _CreateTeamSchedulePage extends ConsumerState<CreateTeamSchedulePage> {
             onPressed: () async {
               /* ---- バリデーション ---- */
               if (_selectedSite == null)          return _showError('現場は必須です');
-              if (_selectedWorkCategory == null)  return _showError('作業内容は必須です');
-              if (_selectedMembers.isEmpty)       return _showError('メンバーを選択してください');
 
               final start = DateTime(_selectedStartDate.year, _selectedStartDate.month, _selectedStartDate.day,
                                      _startTime.hour, _startTime.minute);
@@ -183,10 +184,9 @@ class _CreateTeamSchedulePage extends ConsumerState<CreateTeamSchedulePage> {
                 await addScheduleWithConfirm(
                   context: context,
                   request: ({bool force = false}) async {
-                    await ref.read(teamScheduleMapProvider.notifier).addSchedule(
+                    await ref.read(resourceScheduleMapProvider(widget.resource.id).notifier).addSchedule(
                       selectedSite        : _selectedSite!,
-                      selectedWorkCategory: _selectedWorkCategory!,
-                      memberIds           : _selectedMembers.map((e) => e.id).toList(),
+                      memberIds           : _selectedDrivers.map((e) => e.id).toList(),
                       selectedStartDate   : _selectedStartDate,
                       startTime           : _startTime,
                       selectedEndDate     : _selectedEndDate,
@@ -213,6 +213,13 @@ class _CreateTeamSchedulePage extends ConsumerState<CreateTeamSchedulePage> {
             children: [
               /* ── 上段 ── */
               _InfoCard(children: [
+                // リソース名（固定表示）
+                LabelWithButtonRow(
+                  label: '車両',
+                  value: widget.resource.name,
+                  onTap: () {},   // 編集不可
+                ),
+                const Divider(),
                 LabelWithButtonRow(
                   label: '現場',
                   value: _selectedSite?.name ?? '現場を選択',
@@ -223,41 +230,37 @@ class _CreateTeamSchedulePage extends ConsumerState<CreateTeamSchedulePage> {
                 ),
                 const Divider(),
                 LabelWithButtonRow(
-                  label: '作業内容',
-                  value: _selectedWorkCategory?.name ?? '作業内容を選択',
-                  onTap : () async {
-                    await showWorkSelectorModal(
-                      context: context,
-                      onSelected: (w) => setState(() => _selectedWorkCategory = w),
-                    );
-                    final list =
-                        ref.read(workCategoryListProvider).value ?? [];
-                    if (!list.any((w) => w.id == _selectedWorkCategory?.id)) {
-                      setState(() => _selectedWorkCategory = null);
-                    }
-                  },
-                ),
-                const Divider(),
-                LabelWithButtonRow(
-                  label: 'メンバー',
+                  label: '運転手',
                   value: memberLabel,
                   onTap : _showMemberSelector,
                 ),
 
-                if (_selectedMembers.isNotEmpty) ...[
+                if (_selectedDrivers.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 12,
                     runSpacing: 16,
-                    children: _selectedMembers.map((m) {
+                    children: _selectedDrivers.map((m) {
+                      final hasAvatar = (m.avatarUrl?.isNotEmpty ?? false);
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          buildAvatar(
-                            context: context,
-                            imageUrl: m.avatarUrl,
+                          CircleAvatar(
                             radius: 20,
-                            resolveUrl: resolveImageUrl,
+                            backgroundColor: hasAvatar
+                                ? null
+                                : Colors.white,
+                            backgroundImage: hasAvatar
+                                ? CachedNetworkImageProvider(
+                                    resolveImageUrl(m.avatarUrl!),      // ここは hasAvatar が true
+                                  )
+                                : null,
+                            child: hasAvatar
+                                ? null
+                                : Icon(Icons.person,
+                                    color: Theme.of(context).colorScheme.primary,
+                                    size: 20,
+                                  ),
                           ),
                           const SizedBox(height: 4),
                           SizedBox(

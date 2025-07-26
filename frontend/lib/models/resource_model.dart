@@ -14,7 +14,6 @@ class ResourceModel {
   final bool   isActive;
 
   // ───────── リレーション ─────────
-  final String companyId;
 
   /// *展開済み* のカテゴリ（/api/resources/ で `select_related` している前提）
   ///   - null ならバックエンドが `null` を返したケース
@@ -33,7 +32,6 @@ class ResourceModel {
     required this.id,
     required this.name,
     required this.isActive,
-    required this.companyId,
     required this.createdAt,
     required this.updatedAt,
     this.maker,
@@ -57,7 +55,6 @@ class ResourceModel {
       capacityKg  : json['capacityKg'] as int?,
       description : json['description'] as String?,
       isActive    : json['is_active'] as bool? ?? true,
-      companyId   : json['company'].toString(),
       category    : cat != null ? ResourceCategoryModel.fromJson(cat) : null,
       categoryId  : cat == null ? json['category'] as int? : cat['id'] as int,
       createdById : json['created_by']?.toString(),
@@ -77,8 +74,6 @@ class ResourceModel {
       'capacityKg'  : capacityKg,
       'description' : description,
       'is_active'   : isActive,
-      'company'     : companyId,
-      'category'    : categoryId,
     };
     if (includeId) map['id'] = id;
     return map;

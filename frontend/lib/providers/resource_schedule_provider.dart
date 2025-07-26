@@ -1,24 +1,25 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:frontend/api/schedule_api.dart';          // ← チーム用 API もここに実装した前提
+
+import 'package:frontend/api/schedule_api.dart';
 import 'package:frontend/models/schedule_model.dart';
 import 'package:frontend/models/site_model.dart';
 import 'package:frontend/models/work_category_model.dart';
 import 'package:frontend/providers/dio_provider.dart';
 
-/// チームスケジュール用  StateNotifier
-///
-/// * Personal 版との差分は **API の呼び出し先とペイロード** だけ  
-/// * “予定人員（memberIds）” などチーム特有パラメータは
-///   必要に応じてメソッド引数を拡張してください
-class TeamScheduleMapNotifier
+/// リソース別スケジュール用 Notifier（family）
+/// key: resourceId
+class ResourceScheduleMapNotifier
     extends StateNotifier<AsyncValue<Map<DateTime, List<ScheduleModel>>>> {
+  ResourceScheduleMapNotifier(this.ref, this._resourceId)
+      : super(const AsyncValue.loading());
+
   final Ref ref;
+  final String _resourceId;
+
   DateTime? _lastStart;
   DateTime? _lastEnd;
-
-  TeamScheduleMapNotifier(this.ref) : super(const AsyncValue.loading());
 
   // ---------------- 取得 ----------------
   Future<void> fetch(DateTime start, DateTime end) async {
@@ -27,25 +28,26 @@ class TeamScheduleMapNotifier
       _lastEnd   = end;
 
       state = const AsyncValue.loading();
-      final dio = ref.read(dioProvider);
 
-      // 👇 Personal → Team 用 API へ置換
-      final schedules = await fetchTeamMonthlySchedules(dio, start, end);
+      final dio = ref.read(dioProvider);
+      final schedules = await fetchResourceMonthlySchedules(
+        dio       : dio,
+        resourceId: _resourceId,
+        start     : start,
+        end       : end,
+      );
 
       final map = <DateTime, List<ScheduleModel>>{};
       for (final s in schedules) {
-        // 開始日の 00:00, 終了日の 00:00
         DateTime cur  = DateUtils.dateOnly(s.startTime.toLocal());
         final    last = DateUtils.dateOnly(s.endTime  .toLocal());
-
         while (!cur.isAfter(last)) {
-          map.putIfAbsent(cur, () => []).add(s);   // その日の配列に追加
-          cur = cur.add(const Duration(days: 1));  // 次の日へ
+          map.putIfAbsent(cur, () => []).add(s);
+          cur = cur.add(const Duration(days: 1));
         }
       }
 
       state = AsyncValue.data(map);
-
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -54,30 +56,31 @@ class TeamScheduleMapNotifier
   // ---------------- 作成 ----------------
   Future<void> addSchedule({
     required SiteModel selectedSite,
-    required WorkCategoryModel selectedWorkCategory,
-    required List<String> memberIds,  // 👈 チーム用: 予定人員を追加
     required DateTime selectedStartDate,
     required DateTime startTime,
     required DateTime selectedEndDate,
     required DateTime endTime,
+    WorkCategoryModel? selectedWorkCategory,      // 任意
+    List<String>? memberIds,                     // 任意
     bool force = false,
   }) async {
     final dio = ref.read(dioProvider);
 
     try {
-      await createTeamSchedule(
-        dio              : dio,
-        selectedSite     : selectedSite,
-        selectedWorkCategory: selectedWorkCategory,
-        memberIds        : memberIds,
-        selectedStartDate: selectedStartDate,
-        startTime        : startTime,
-        selectedEndDate  : selectedEndDate,
-        endTime          : endTime,
-        force            : force,      // ★
+      await createResourceSchedule(
+        dio            : dio,
+        resourceId     : _resourceId,
+        selectedSite   : selectedSite,
+        startDate      : selectedStartDate,
+        startTime      : startTime,
+        endDate        : selectedEndDate,
+        endTime        : endTime,
+        workCategoryId : selectedWorkCategory?.id,
+        memberIds      : memberIds,
+        force          : force,
       );
     } on DioException catch (e) {
-      if (e.response?.statusCode == 409) rethrow;
+      if (e.response?.statusCode == 409) rethrow; // UI側でダイアログ表示
       state = AsyncValue.error(e, StackTrace.current);
       return;
     } catch (e, st) {
@@ -96,9 +99,9 @@ class TeamScheduleMapNotifier
   Future<void> deleteSchedule(String scheduleId) async {
     try {
       final dio = ref.read(dioProvider);
-      await deleteTeamScheduleApi(dio, scheduleId);   // 👈 置換
+      await deleteResourceScheduleApi(dio, scheduleId);
 
-      // ローカルキャッシュを即時更新
+      // ローカル更新
       final cur  = state.value ?? {};
       final next = <DateTime, List<ScheduleModel>>{};
       cur.forEach((d, list) {
@@ -107,11 +110,9 @@ class TeamScheduleMapNotifier
       });
       state = AsyncValue.data(next);
 
-      // バックエンドと再同期
       if (_lastStart != null && _lastEnd != null) {
         await fetch(_lastStart!, _lastEnd!);
       }
-
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -121,26 +122,31 @@ class TeamScheduleMapNotifier
   Future<void> updateSchedule({
     required String id,
     required SiteModel selectedSite,
-    required WorkCategoryModel selectedWorkCategory,
-    required List<String> memberIds,   // 👈 追加
-    required List<String> teamIds,
     required DateTime selectedStartDate,
     required DateTime startTime,
     required DateTime selectedEndDate,
     required DateTime endTime,
+    WorkCategoryModel? selectedWorkCategory,
+    List<String>? memberIds,
   }) async {
     try {
       final dio = ref.read(dioProvider);
 
-      final payload = {
-        'site_id'            : selectedSite.id,
-        'work_category_id': selectedWorkCategory.id,
-        'member_ids'      : memberIds,  // 👈 チーム用
-        'start_time'      : _combine(selectedStartDate, startTime).toIso8601String(),
-        'end_time'        : _combine(selectedEndDate, endTime).toIso8601String(),
+      final payload = <String, dynamic>{
+        'site_id'   : selectedSite.id,
+        'start_time': _combine(selectedStartDate, startTime).toIso8601String(),
+        'end_time'  : _combine(selectedEndDate, endTime).toIso8601String(),
+        'resource_id': _resourceId,
+        // schedule_type は PATCH 時省略可（変更しない）
       };
+      if (selectedWorkCategory != null) {
+        payload['work_category_id'] = selectedWorkCategory.id;
+      }
+      if (memberIds != null) {
+        payload['member_ids'] = memberIds;
+      }
 
-      await updateTeamScheduleApi(     // 👈 置換
+      await updateResourceScheduleApi(
         dio       : dio,
         scheduleId: id,
         payload   : payload,
@@ -151,21 +157,21 @@ class TeamScheduleMapNotifier
       final end   = _lastEnd ??
           DateTime(selectedStartDate.year, selectedStartDate.month + 1, 0);
       await fetch(start, end);
-
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       rethrow;
     }
   }
 
-  // ---------------- util ----------------
+  // util
   DateTime _combine(DateTime d, DateTime t) =>
       DateTime(d.year, d.month, d.day, t.hour, t.minute);
 }
 
-/// Provider 登録
-final teamScheduleMapProvider = StateNotifierProvider<
-    TeamScheduleMapNotifier,
-    AsyncValue<Map<DateTime, List<ScheduleModel>>>>(
-  (ref) => TeamScheduleMapNotifier(ref),
-);
+/// family Provider
+final resourceScheduleMapProvider = StateNotifierProvider.family<
+    ResourceScheduleMapNotifier,
+    AsyncValue<Map<DateTime, List<ScheduleModel>>>,
+    String>((ref, resourceId) {
+  return ResourceScheduleMapNotifier(ref, resourceId);
+});

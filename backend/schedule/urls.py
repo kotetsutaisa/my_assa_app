@@ -5,6 +5,7 @@ from .views import (
     WorkCategoryDestroyView,
     ScheduleDetailAPIView,
     TeamMonthlyScheduleAPIView,
+    ResourceMonthlyScheduleAPIView
 )
 
 urlpatterns = [
@@ -13,4 +14,5 @@ urlpatterns = [
     path('my-monthly/', MyMonthlyScheduleAPIView.as_view(), name='my-monthly-schedule'),
     path("team-monthly/", TeamMonthlyScheduleAPIView.as_view(), name="team-monthly"),
     path('<uuid:pk>/',   ScheduleDetailAPIView.as_view(),   name='schedule-detail'),
+    path('resource-monthly/', ResourceMonthlyScheduleAPIView.as_view(), name='resource-shedule'),
 ]

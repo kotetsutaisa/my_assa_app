@@ -5,6 +5,7 @@ import 'package:frontend/providers/my_personal_schedule_provider.dart';
 import 'package:frontend/providers/selected_date_provider.dart';
 import 'package:frontend/providers/selected_team_date_provider.dart';
 import 'package:frontend/providers/team_schedule_provider.dart';   // ★ 追加
+import 'package:frontend/providers/user_provider.dart';
 
 import 'package:frontend/screens/schedule/create_schedule_page.dart';
 import 'package:frontend/screens/schedule/create_team_schedule_page.dart';
@@ -50,7 +51,10 @@ class _ScheduleTabPageState extends ConsumerState<ScheduleTabPage> {
       final end    = DateTime(today.year, today.month + 1, 0);
 
       ref.read(myPersonalScheduleMapProvider.notifier).fetch(start, end);
-      ref.read(teamScheduleMapProvider.notifier).fetch(start, end);
+      final user = ref.read(userProvider);
+      if (user?.hasTeam == true) {
+        ref.read(teamScheduleMapProvider.notifier).fetch(start, end);
+      }
 
       _hasFetched = true;
     }
@@ -58,12 +62,37 @@ class _ScheduleTabPageState extends ConsumerState<ScheduleTabPage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(userProvider);
+    print(user?.teams);
+    final hasTeam = user?.hasTeam ?? false;
+
+    // チームが無いのにタブ index が 1 なら 0 に戻す
+    if (!hasTeam && _tabIndex != 0) {
+      _tabIndex = 0;
+    }
+
+    // 表示ページを構築
+    final pages = <Widget>[
+      const PersonalScheduleTab(),
+      if (hasTeam) const TeamScheduleTab(),
+    ];
+
+    // PageController の現在ページが範囲外になった場合の保険
+    if (_pageController.positions.isNotEmpty &&
+        _pageController.page != null &&
+        _pageController.page!.round() >= pages.length) {
+      // 先に jumpToPage で 0 に戻す
+      _pageController.jumpToPage(0);
+    }
+
+
     return Scaffold(
       body: Column(
         children: [
           // ---------------- タブバー ----------------
           ScheduleTabBarWidget(
             tabIndex: _tabIndex,
+            showTeamTab: hasTeam,
             onTabChanged: (index) {
               setState(() => _tabIndex = index);
               _pageController.animateToPage(
@@ -81,10 +110,7 @@ class _ScheduleTabPageState extends ConsumerState<ScheduleTabPage> {
               onPageChanged: (index) {
                 setState(() => _tabIndex = index);
               },
-              children: const [
-                PersonalScheduleTab(),
-                TeamScheduleTab(),
-              ],
+              children: pages,
             ),
           ),
         ],

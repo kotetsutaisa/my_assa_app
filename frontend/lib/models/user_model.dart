@@ -2,6 +2,7 @@
 
 import 'package:frontend/exceptions/user_role.dart';
 import 'package:frontend/models/company_model.dart';
+import 'package:frontend/models/team_info_model.dart';
 
 class UserModel {
   final int id;
@@ -12,6 +13,7 @@ class UserModel {
   final String? bio;
   final Company? company;
   final UserRole role;
+  final List<TeamInfo> teams;
 
   // 引数セットと値代入
   // requiredは引数を必須にしてる
@@ -24,11 +26,13 @@ class UserModel {
     this.iconimg,
     this.bio,
     this.company,
+    this.teams = const [],
   });
 
   // factory = "インスタンス作成の柔軟なコントローラー"
   // 引数で受け取ったMap型のjsonをUserModelにセット(インスタンス化)
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    final teamsJson = (json['teams'] as List?) ?? const [];
     return UserModel(
       id: json['id'],
       email: json['email'],
@@ -38,6 +42,7 @@ class UserModel {
       iconimg: json['iconimg'],
       company: json['company'] != null ? Company.fromJson(json['company']) : null,
       role: UserRoleX.fromApi(json['role'] as String?),
+      teams    : teamsJson.map((t) => TeamInfo.fromJson(t as Map<String, dynamic>)).toList(),
     );
   }
 
@@ -70,6 +75,7 @@ class UserModel {
     String? bio,
     Company? company,
     UserRole? role,
+    List<TeamInfo>? teams,
   }) {
     return UserModel(
       id        : id,
@@ -80,6 +86,7 @@ class UserModel {
       bio       : bio       ?? this.bio,
       company   : company   ?? this.company,
       role      : role      ?? this.role,
+      teams     : teams     ?? this.teams,
     );
   }
 
@@ -88,4 +95,5 @@ class UserModel {
   bool get isManager => role == UserRole.manager;
   bool get isMember  => role == UserRole.member || role == UserRole.unknown;
   bool get canManageResources => role.canManageResources;
+  bool get hasTeam          => teams.isNotEmpty;
 }

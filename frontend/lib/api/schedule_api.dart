@@ -146,6 +146,7 @@ Future<ScheduleModel> createTeamSchedule({
   required DateTime startTime,
   required DateTime selectedEndDate,
   required DateTime endTime,
+  List<String>? teamIds,
   bool force = false,
 }) async {
   // 開始日時
@@ -172,16 +173,22 @@ Future<ScheduleModel> createTeamSchedule({
 
   final qs = force ? '?force=true' : '';
 
+  final payload = <String, dynamic>{
+    'site_id'         : selectedSite.id,
+    'start_time'      : startDateTime.toIso8601String(),
+    'end_time'        : endDateTime.toIso8601String(),
+    'schedule_type'   : 'team',                // （バックエンドで固定なら省略可）
+    'work_category_id': selectedWorkCategory.id,
+    'member_ids'      : memberIds,
+  };
+
+  if (teamIds != null && teamIds.isNotEmpty) {
+    payload['team_ids'] = teamIds;
+  }
+
   final res = await dio.post(
     'schedule/team-monthly/$qs',
-    data: {
-      'site_id'         : selectedSite.id,
-      'start_time'      : startDateTime.toIso8601String(),
-      'end_time'        : endDateTime.toIso8601String(),
-      'schedule_type'   : 'team',             // バックエンド側で上書きする設計なら省略可
-      'work_category_id': selectedWorkCategory.id,
-      'member_ids'      : memberIds,          // ← ★ ここが Personal と違う
-    },
+    data: payload,
   );
 
   return ScheduleModel.fromJson(res.data as Map<String, dynamic>);
@@ -202,4 +209,93 @@ Future<ScheduleModel> updateTeamScheduleApi({
 }) async {
   final res = await dio.patch('schedule/$scheduleId/', data: payload);
   return ScheduleModel.fromJson(res.data);
+}
+
+
+
+/* ------------------------------------------------------------------ */
+/*                          ▼ リソーススケジュール ▼                    */
+/* ------------------------------------------------------------------ */
+
+/// 月間取得（リソース別）
+/// GET /api/schedule/resource-monthly/?resource_id=xxx&start=...&end=...
+Future<List<ScheduleModel>> fetchResourceMonthlySchedules({
+  required Dio dio,
+  required String resourceId,
+  required DateTime start,
+  required DateTime end,
+}) async {
+  final res = await dio.get(
+    'schedule/resource-monthly/',
+    queryParameters: {
+      'resource_id': resourceId,
+      'start'      : start.toIso8601String(),
+      'end'        : end.toIso8601String(),
+    },
+  );
+
+  return (res.data as List)
+      .map((json) => ScheduleModel.fromJson(json))
+      .toList();
+}
+
+/// 作成
+/// POST /api/schedule/resource-monthly/  (?force=true 対応)
+Future<ScheduleModel> createResourceSchedule({
+  required Dio dio,
+  required String resourceId,
+  required SiteModel selectedSite,
+  required DateTime startDate,
+  required DateTime startTime,
+  required DateTime endDate,
+  required DateTime endTime,
+  int? workCategoryId,        // 任意
+  List<String>? memberIds,       // 任意
+  bool force = false,
+}) async {
+  final startDT = DateTime(
+    startDate.year, startDate.month, startDate.day,
+    startTime.hour, startTime.minute,
+  );
+  final endDT = DateTime(
+    endDate.year, endDate.month, endDate.day,
+    endTime.hour, endTime.minute,
+  );
+
+  if (!endDT.isAfter(startDT)) {
+    throw Exception('終了日時は開始日時より後にしてください');
+  }
+
+  final payload = <String, dynamic>{
+    'resource_id'    : resourceId,
+    'site_id'        : selectedSite.id,
+    'start_time'     : startDT.toIso8601String(),
+    'end_time'       : endDT.toIso8601String(),
+    'schedule_type'  : 'resource',   // バックエンドで固定なら省略可
+  };
+  if (workCategoryId != null) payload['work_category_id'] = workCategoryId;
+  if (memberIds != null && memberIds.isNotEmpty) {
+    payload['member_ids'] = memberIds;
+  }
+
+  final qs = force ? '?force=true' : '';
+  final res = await dio.post('schedule/resource-monthly/$qs', data: payload);
+  return ScheduleModel.fromJson(res.data as Map<String, dynamic>);
+}
+
+/// 更新
+/// PATCH /api/schedule/<id>/
+Future<ScheduleModel> updateResourceScheduleApi({
+  required Dio dio,
+  required String scheduleId,
+  required Map<String, dynamic> payload,
+}) async {
+  final res = await dio.patch('schedule/$scheduleId/', data: payload);
+  return ScheduleModel.fromJson(res.data);
+}
+
+/// 削除（共通エンドポイント）
+/// DELETE /api/schedule/<id>/
+Future<void> deleteResourceScheduleApi(Dio dio, String scheduleId) async {
+  await dio.delete('schedule/$scheduleId/');
 }

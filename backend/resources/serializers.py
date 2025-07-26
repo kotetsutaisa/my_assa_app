@@ -69,12 +69,7 @@ class ResourceSerializer(serializers.ModelSerializer):
 
     # ---------------- 作成 ----------------
     def create(self, validated_data):
-        user = self.context["request"].user
-        return Resource.objects.create(
-            company = user.company,
-            created_by = user,
-            **validated_data,
-        )
+        return super().create(validated_data)
 
     # ---------------- 更新 ----------------
     def update(self, instance, validated_data):

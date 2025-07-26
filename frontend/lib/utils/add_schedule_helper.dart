@@ -23,26 +23,47 @@ class AddScheduleParams {
 /// “409→確認→force=true” 共通処理
 Future<void> addScheduleWithConfirm({
   required BuildContext context,
-  required Future<void> Function({bool force}) request,   // ← 成功時/再試行時に呼ぶ
+  required Future<void> Function({bool force}) request,
+  String? conflictTitle,     // ← 追加
+  String? conflictMessage,   // ← 追加
+  String okLabel = '上書き',
+  String cancelLabel = 'キャンセル',
 }) async {
   try {
     await request(force: false);
-    return;                           // 正常終了
+    return;
   } on DioException catch (e) {
     if (e.response?.statusCode != 409) rethrow;
+
+    // バックエンドの detail で出し分ける（resource_overlap / member_overlap / overlap など）
+    final detail = e.response?.data is Map
+        ? (e.response?.data['detail'] as String?)
+        : null;
+
+    // デフォルト文言
+    String title   = conflictTitle  ?? '予定が重複しています';
+    String message = conflictMessage ?? '既存の予定を削除して登録しますか？';
+
+    if (detail == 'resource_overlap') {
+      title   = conflictTitle  ?? 'リソース予約が重複しています';
+      message = conflictMessage ?? '既存の予約を削除して登録しますか？';
+    } else if (detail == 'member_overlap') {
+      title   = conflictTitle  ?? 'メンバーの予定が重複しています';
+      message = conflictMessage ?? '重複しているメンバーを外して登録しますか？';
+    }
 
     final bool? ok = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title  : const Text('予定が重複しています'),
-        content: const Text('既存の予定を削除して登録しますか？'),
+        title  : Text(title),
+        content: Text(message),
         actions: [
           TextButton(
-            child: const Text('キャンセル'),
+            child: Text(cancelLabel),
             onPressed: () => Navigator.pop(dialogCtx, false),
           ),
           TextButton(
-            child: const Text('上書き'),
+            child: Text(okLabel),
             onPressed: () => Navigator.pop(dialogCtx, true),
           ),
         ],
@@ -50,7 +71,7 @@ Future<void> addScheduleWithConfirm({
     );
 
     if (ok == true) {
-      await request(force: true);     // ← 再実行 (force= true)
+      await request(force: true);
     }
   }
 }

@@ -16,6 +16,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from companies.models import Company  # 明示インポート
 from companies.serializers import CompanyCreateSerializer
+from companies.models import TeamMember
+from django.contrib.auth.models import AbstractUser
 
 User = get_user_model()
 
@@ -31,21 +33,49 @@ def normalize_email(value: str) -> str:
     """大小・全角半角を吸収。"""
     return value.strip().lower()
 
+def _build_teams_list(user: AbstractUser):
+    # is_active のみ採用
+    memberships = (
+        user.team_memberships
+            .select_related('team')
+            .filter(is_active=True)
+    )
+    return [
+        {
+            "id"  : tm.team.id,
+            "name": tm.team.name,
+            "role": tm.role,
+        }
+        for tm in memberships
+    ]
+
+class TeamMembershipMiniSerializer(serializers.Serializer):
+    """ユーザーが所属する各チームの最小情報"""
+    id   = serializers.UUIDField()
+    name = serializers.CharField()
+    role = serializers.CharField()
+
+
+
 # --------------------------------------------------
 # 1. ユーザー情報シリアライザ（参照用）
 # --------------------------------------------------
 class SimpleUserSerializer(serializers.ModelSerializer):
     iconimg = serializers.ImageField(use_url=True)
+    teams   = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ("id", "email", "username", "account_id", "iconimg", "role")
+        fields = ("id", "email", "username", "account_id", "iconimg", "role", "teams")
+
+    def get_teams(self, obj):
+        return _build_teams_list(obj)
 
 
 class FullUserSerializer(serializers.ModelSerializer):
     iconimg = serializers.ImageField(use_url=True)
     company = CompanyCreateSerializer(read_only=True)
-    team = serializers.SerializerMethodField()
+    teams = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -60,18 +90,11 @@ class FullUserSerializer(serializers.ModelSerializer):
             "role",
             "is_active",
             "date_joined",
-            "team",
+            "teams",
         )
 
-    def get_team(self, obj):
-        team_member = obj.team_memberships.all().select_related('team').first()
-        if team_member:
-            return {
-                'id': team_member.team.id,
-                'name': team_member.team.name,
-                'role': team_member.role,
-            }
-        return None
+    def get_teams(self, obj):
+        return _build_teams_list(obj)
 
 # --------------------------------------------------
 # 2. JWT ログイン

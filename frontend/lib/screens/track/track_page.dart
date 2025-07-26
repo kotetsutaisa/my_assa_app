@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:frontend/models/resource_model.dart';
-import 'package:frontend/models/user_model.dart';
 import 'package:frontend/providers/resource_provider.dart';
-import 'package:frontend/providers/user_provider.dart';  // ResourceListNotifier / resourceListProvider
+import 'package:frontend/providers/user_provider.dart';
+import 'package:frontend/screens/track/resource_detail_page.dart';
+import 'package:frontend/screens/track/resource_form_page.dart';  // ResourceListNotifier / resourceListProvider
 // import 'package:frontend/providers/current_user_provider.dart'; // 権限チェックで使うなら
 
 /// 搬入・搬出（共有リソース）一覧ページ
@@ -90,10 +91,9 @@ class _ResourceTile extends StatelessWidget {
       subtitle: subtitle != null ? Text(subtitle) : null,
       trailing: const Icon(Icons.chevron_right),
       onTap   : () {
-        // TODO: 詳細／編集ページへ。例:
-        // Navigator.push(context, MaterialPageRoute(
-        //   builder: (_) => ResourceDetailPage(resource: resource),
-        // ));
+        Navigator.push(context, MaterialPageRoute(
+          builder: (_) => ResourceDetailPage(resource: resource),
+        ));
       },
     );
   }
@@ -150,27 +150,22 @@ class _ErrorView extends StatelessWidget {
 class AddFab extends ConsumerWidget {
   const AddFab({super.key});
 
-  /// admin / manager だけ “新規作成” を許可
-  bool _canCreate(UserModel? user) {
-    if (user == null) return false;
-    return user.role == 'admin' || user.role == 'manager';
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // UserModel? をそのまま受け取る
     final user = ref.watch(userProvider);
-    print(user!.role);
 
-    // 権限が無ければ FAB を非表示
-    if (!_canCreate(user)) return const SizedBox.shrink();
+    // ❶ ログインしていない or 権限なし → ボタン非表示
+    if (user == null || !user.canManageResources) {
+      return const SizedBox.shrink();
+    }
 
-    // 権限 OK → 通常の FAB
+    // ❷ 権限 OK → ボタン表示
     return FloatingActionButton(
       onPressed: () {
-        // ここに作成フォームへの遷移などを実装
-        // Navigator.push(context,
-        //   MaterialPageRoute(builder: (_) => const CreateResourcePage()));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ResourceFormPage()),
+        );
       },
       backgroundColor: Theme.of(context).primaryColor,
       child: const Icon(Icons.add, size: 30, color: Colors.white),
