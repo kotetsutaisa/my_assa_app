@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'site_app',
     'schedule',
     'resources',
+    'reports',
 ]
 
 MIDDLEWARE = [

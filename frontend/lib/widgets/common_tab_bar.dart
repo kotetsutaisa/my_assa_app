@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:frontend/screens/reports/reports_root_page.dart';
 import 'package:frontend/utils/constants.dart';
 
 // プロバイダー
@@ -9,7 +10,6 @@ import '../providers/current_page_provider.dart';
 // タブページ
 import '../screens/home_tab_page.dart';
 import '../screens/timeline/timeline_tab_page.dart';
-import '../screens/worksite_tab_page.dart';
 import '../screens/schedule/schedule_tab_page.dart';
 import '../screens/chat/chat_list_page.dart';
 import '../screens/profile/profile_tab_page.dart';
@@ -64,7 +64,7 @@ class CustomTabBar extends ConsumerWidget {
   int _getCurrentTabIndex(Widget currentPage) {
     if (currentPage is HomeTabPage) return 0;
     if (currentPage is TimelineTabPage) return 1;
-    if (currentPage is WorksiteTabPage) return 2;
+    if (currentPage is ReportsRootPage) return 2;
     if (currentPage is ScheduleTabPage) return 3;
     if (currentPage is ChatListPage) return 4;
     if (currentPage is ProfileTabPage) return 5;
@@ -79,7 +79,7 @@ class CustomTabBar extends ConsumerWidget {
       case 1:
         return const TimelineTabPage();
       case 2:
-        return const WorksiteTabPage();
+        return const ReportsRootPage();
       case 3:
         return const ScheduleTabPage();
       case 4:

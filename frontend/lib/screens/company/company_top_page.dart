@@ -9,7 +9,9 @@ class CompanyTopPage extends StatelessWidget {
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context), // ← 前の画面に戻る
+          onPressed: () {
+            Navigator.pushReplacementNamed(context, '/login');
+          }
         ),
         title: Text(
           'Fj',

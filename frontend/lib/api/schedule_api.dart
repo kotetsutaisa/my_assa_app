@@ -117,16 +117,18 @@ Future<void> deleteWorkCategory(Dio dio, int id) async {
 /* ------------------------------------------------------------------ */
 
 // 月間取得
-Future<List<ScheduleModel>> fetchTeamMonthlySchedules(
-  Dio dio,
-  DateTime start,
-  DateTime end,
-) async {
+Future<List<ScheduleModel>> fetchTeamMonthlySchedules({
+  required Dio dio,
+  String? teamId,
+  required DateTime start,
+  required DateTime end,
+}) async {
   final res = await dio.get(
     'schedule/team-monthly/',
     queryParameters: {
       'start': start.toIso8601String(),
       'end': end.toIso8601String(),
+      if (teamId != null && teamId.isNotEmpty) 'team_id': teamId,
     },
   );
 

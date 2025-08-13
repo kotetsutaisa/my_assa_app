@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/models/team_info_model.dart';
 import '../exceptions/api_exception.dart';
 import '../providers/dio_provider.dart';
 import '../models/company_model.dart';
@@ -120,5 +121,26 @@ Future<void> joinCompany({
         res.statusCode,
       );
   }
+}
+
+
+
+/// 会社内のチーム一覧（権限に応じて）
+/// - admin: 全チーム
+/// - leader: 自分がリーダーのチームのみ
+/// - その他: 空配列
+Future<List<TeamInfo>> fetchCompanyTeams(Dio dio) async {
+  final res = await dio.get('companies/teams/');
+  final list = (res.data as List).cast<Map<String, dynamic>>();
+
+  // バックエンドの is_leader を TeamInfo.role に変換
+  return list.map((j) {
+    final isLeader = (j['is_leader'] as bool?) ?? false;
+    return TeamInfo(
+      id: j['id'] as String,
+      name: j['name'] as String,
+      role: isLeader ? 'leader' : 'member',
+    );
+  }).toList(growable: false);
 }
 

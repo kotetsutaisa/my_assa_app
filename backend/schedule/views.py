@@ -104,6 +104,18 @@ class MyMonthlyScheduleAPIView(OverlapSafeCreateMixin, generics.ListCreateAPIVie
 
         return qs.order_by("start_time")
     
+    def get_overlap_queryset(self):
+        user = self.request.user
+        return (
+            Schedule.objects
+            .filter(
+                company=user.company,
+                schedule_type__in=[ScheduleType.PERSONAL, ScheduleType.TEAM],
+            )
+            .select_related("site", "work_category")
+            .prefetch_related("members", "teams")
+        )
+    
     def perform_create(self, serializer):
         """
         POST /api/schedule/my-monthly/ で呼ばれる。
@@ -122,6 +134,7 @@ class MyMonthlyScheduleAPIView(OverlapSafeCreateMixin, generics.ListCreateAPIVie
         if (schedule.schedule_type == ScheduleType.PERSONAL
                 and schedule.members.count() == 0):
             schedule.members.add(user)
+            
 
 
 
@@ -150,7 +163,7 @@ class ScheduleDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
 class TeamMonthlyScheduleAPIView(OverlapSafeCreateMixin, generics.ListCreateAPIView):
     """
-    GET  /api/schedule/team-monthly/?start=2025-07-01T00:00:00Z&end=2025-07-31T23:59:59Z
+    GET  /api/schedule/team-monthly/?start=2025-07-01T00:00:00Z&end=2025-07-31T23:59:59Z[&team_id=<uuid>] 
     POST /api/schedule/team-monthly/
       - POST は OverlapSafeCreateMixin により重複整理ロジック適用
     """
@@ -194,6 +207,11 @@ class TeamMonthlyScheduleAPIView(OverlapSafeCreateMixin, generics.ListCreateAPIV
                     start_time__lt=end,    # 予定開始 < 期間の終端
                     end_time__gt=start,    # 予定終了 > 期間の開始
                 )
+
+        # ---- ★ team_id パラメータで追加絞り込み ----
+        team_id_param = self.request.query_params.get("team_id")
+        if team_id_param:
+            qs = qs.filter(teams__id=team_id_param)
 
         return qs.order_by("start_time")
 

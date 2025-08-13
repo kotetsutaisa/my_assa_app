@@ -15,10 +15,11 @@ import 'package:frontend/providers/dio_provider.dart';
 class TeamScheduleMapNotifier
     extends StateNotifier<AsyncValue<Map<DateTime, List<ScheduleModel>>>> {
   final Ref ref;
+  final String? teamId;
   DateTime? _lastStart;
   DateTime? _lastEnd;
 
-  TeamScheduleMapNotifier(this.ref) : super(const AsyncValue.loading());
+  TeamScheduleMapNotifier(this.ref, {this.teamId}) : super(const AsyncValue.loading());
 
   // ---------------- 取得 ----------------
   Future<void> fetch(DateTime start, DateTime end) async {
@@ -30,7 +31,12 @@ class TeamScheduleMapNotifier
       final dio = ref.read(dioProvider);
 
       // 👇 Personal → Team 用 API へ置換
-      final schedules = await fetchTeamMonthlySchedules(dio, start, end);
+      final schedules = await fetchTeamMonthlySchedules(
+        dio: dio,
+        teamId: teamId,   // ← null ならクエリに含まれない
+        start: start,
+        end: end,
+      );
 
       final map = <DateTime, List<ScheduleModel>>{};
       for (final s in schedules) {

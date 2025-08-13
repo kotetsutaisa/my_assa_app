@@ -161,3 +161,21 @@ class TeamMemberSerializer(serializers.ModelSerializer):
            obj.user,
            context=self.context
         ).data
+    
+
+# チーム一覧表示用
+class TeamListItemSerializer(serializers.ModelSerializer):
+    member_count = serializers.IntegerField(read_only=True, source='member_count_db')
+    is_leader = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Team
+        fields = ("id", "name", "member_count", "is_leader")
+
+    def get_is_leader(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return TeamMember.objects.filter(
+            team=obj, user=request.user, role="leader"
+        ).exists()

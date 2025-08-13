@@ -12,11 +12,11 @@ from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated
 from .models import InviteCode
 from .serializers import InviteCodeCreateSerializer
-from .serializers import InviteCodeUseSerializer
+from .serializers import InviteCodeUseSerializer, TeamListItemSerializer
 from .permissions import IsCompanyAdminOrManager
 from timeline.permissions import IsCompanyMember
 from users.serializers import FullUserSerializer
-from django.db.models import Case, When, IntegerField, Prefetch
+from django.db.models import Case, When, IntegerField, Prefetch, Count, Exists
 
 User = get_user_model()
 
@@ -186,3 +186,40 @@ class CompanyMemberListCreateView(generics.ListCreateAPIView):
         } for u in members_no_team)
 
         return Response(result)
+    
+
+
+class CompanyTeamListAPIView(generics.ListAPIView):
+    """
+    GET /api/companies/teams/
+      - admin: 会社内の全チームを返す
+      - leader: 自分が「leader」のチームのみ返す
+      - その他: 空配列
+    レスポンス: [{id, name, member_count, is_leader}, ...]
+    """
+    permission_classes = [permissions.IsAuthenticated, IsCompanyMember]
+    serializer_class = TeamListItemSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = (
+            Team.objects
+            .filter(company=user.company)
+            .annotate(
+                member_count_db=Count("members"),
+            )
+            .order_by("created_at")
+        )
+
+        if getattr(user, "role", None) == "admin":
+            return qs
+
+        leader_team_ids = TeamMember.objects.filter(
+            user=user, role="leader", team__company=user.company
+        ).values_list("team_id", flat=True)
+
+        if leader_team_ids.exists():
+            return qs.filter(id__in=leader_team_ids)
+
+        # 一般ユーザーはチーム選択不可 → 空
+        return qs.none()

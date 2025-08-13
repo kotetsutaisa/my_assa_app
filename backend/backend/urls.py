@@ -38,6 +38,7 @@ urlpatterns = [
     path('api/sites/', include('site_app.urls')),
     path('api/schedule/', include('schedule.urls')),
     path('api/resources/', include('resources.urls')),
+    path('api/reports/', include('reports.urls')),
 ]
 
 if settings.DEBUG:

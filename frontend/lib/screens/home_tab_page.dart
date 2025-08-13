@@ -69,14 +69,14 @@ class _HomeTabPageState extends ConsumerState<HomeTabPage> {
                               ? user.iconimg!
                               : resolveImageUrl(user.iconimg!),
                         ),
-                        backgroundColor: Colors.grey[200],
+                        backgroundColor: Theme.of(context).primaryColor,
                       ),
                     )
                   else
                     CircleAvatar(
-                      radius: 15,
-                      backgroundColor: Theme.of(context).colorScheme.secondary,
-                      child: Icon(Icons.person, color: Colors.white),
+                      radius: 25,
+                      backgroundColor: Theme.of(context).primaryColor,
+                      child: Icon(Icons.person, color: Colors.white, size: 30,),
                     ),
                   const SizedBox(width: 20),
                   Text(
