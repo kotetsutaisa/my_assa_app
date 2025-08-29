@@ -9,6 +9,7 @@ class Role(models.TextChoices):
     ADMIN = 'admin', _('管理者')
     MANAGER = 'manager', _('部長')
     MEMBER = 'member', _('一般')
+    CLERK = 'clerk', _('事務員')
 
 
 

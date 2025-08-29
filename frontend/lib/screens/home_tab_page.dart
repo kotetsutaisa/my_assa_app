@@ -4,6 +4,7 @@ import 'package:frontend/providers/current_page_provider.dart';
 import 'package:frontend/screens/company/company_page.dart';
 import 'package:frontend/screens/invitation_page.dart';
 import 'package:frontend/screens/new_work_page.dart';
+import 'package:frontend/screens/office/office_home_page.dart';
 import 'package:frontend/screens/site/site_list_page.dart';
 import 'package:frontend/screens/track/track_page.dart';
 import 'package:frontend/utils/constants.dart';
@@ -28,7 +29,6 @@ class _HomeTabPageState extends ConsumerState<HomeTabPage> {
     return '$base$path';
   }
   
-
   @override
   Widget build(BuildContext context) {
     // ログインユーザー情報を取得
@@ -76,7 +76,7 @@ class _HomeTabPageState extends ConsumerState<HomeTabPage> {
                     CircleAvatar(
                       radius: 25,
                       backgroundColor: Theme.of(context).primaryColor,
-                      child: Icon(Icons.person, color: Colors.white, size: 30,),
+                      child: const Icon(Icons.person, color: Colors.white, size: 30),
                     ),
                   const SizedBox(width: 20),
                   Text(
@@ -91,7 +91,7 @@ class _HomeTabPageState extends ConsumerState<HomeTabPage> {
                     ),
                   ),
 
-                  Spacer(),
+                  const Spacer(),
 
                   // 歯車アイコンボタン
                   IconButton(
@@ -108,6 +108,29 @@ class _HomeTabPageState extends ConsumerState<HomeTabPage> {
               ),
             ),
           ),
+
+          // ここで事務ボタンを中央に配置（管理者 or 事務員のみ表示）
+          if (user?.isAdmin == true || user?.isClerk == true)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Card(
+                    elevation: 1.5,
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      leading: const Icon(Icons.domain),
+                      title: const Text('事務'),
+                      subtitle: const Text('会社設定・事務作業など'),
+                      onTap: () {
+                        ref.read(currentPageProvider.notifier).state = const OfficeHomePage();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // メイン
           Padding(
@@ -152,3 +175,4 @@ class _HomeTabPageState extends ConsumerState<HomeTabPage> {
     );
   }
 }
+

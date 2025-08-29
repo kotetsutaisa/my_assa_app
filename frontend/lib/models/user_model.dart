@@ -93,6 +93,7 @@ class UserModel {
   // 権限ショートカット
   bool get isAdmin   => role == UserRole.admin;
   bool get isManager => role == UserRole.manager;
+  bool get isClerk => role == UserRole.clerk;
   bool get isMember  => role == UserRole.member || role == UserRole.unknown;
   bool get canManageResources => role.canManageResources;
   bool get hasTeam          => teams.isNotEmpty;

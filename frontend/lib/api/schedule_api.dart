@@ -3,17 +3,33 @@ import 'package:frontend/models/schedule_model.dart';
 import 'package:frontend/models/site_model.dart';
 import 'package:frontend/models/work_category_model.dart';
 
+DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
+DateTime _endOfDayInclusive(DateTime d) =>
+    DateTime(d.year, d.month, d.day, 23, 59, 59, 999);
+
+/// 月末 00:00 が渡ってくるケースを吸収して安全な end を返す。
+DateTime _normalizeMonthlyEnd(DateTime end) {
+  // もし end が "日付のみ(=00:00)" なら、その日の 23:59:59.999 に補正
+  final isMidnight =
+      end.hour == 0 && end.minute == 0 && end.second == 0 &&
+      end.millisecond == 0 && end.microsecond == 0;
+  return isMidnight ? _endOfDayInclusive(end) : end;
+}
+
+
 // スケジュール取得
 Future<List<ScheduleModel>> fetchMyMonthlySchedules(
   Dio dio,
   DateTime start,
   DateTime end
 ) async {
+  final startParam = _startOfDay(start);
+  final endParam   = _normalizeMonthlyEnd(end);
   final response = await dio.get(
     'schedule/my-monthly/',
     queryParameters: {
-      'start': start.toIso8601String(),
-      'end': end.toIso8601String(),
+      'start': startParam.toIso8601String(),
+      'end'  : endParam.toIso8601String(),
     },
   );
 
@@ -123,11 +139,13 @@ Future<List<ScheduleModel>> fetchTeamMonthlySchedules({
   required DateTime start,
   required DateTime end,
 }) async {
+  final startParam = _startOfDay(start);
+  final endParam   = _normalizeMonthlyEnd(end);
   final res = await dio.get(
     'schedule/team-monthly/',
     queryParameters: {
-      'start': start.toIso8601String(),
-      'end': end.toIso8601String(),
+      'start': startParam.toIso8601String(),
+      'end'  : endParam.toIso8601String(),
       if (teamId != null && teamId.isNotEmpty) 'team_id': teamId,
     },
   );
@@ -227,12 +245,14 @@ Future<List<ScheduleModel>> fetchResourceMonthlySchedules({
   required DateTime start,
   required DateTime end,
 }) async {
+  final startParam = _startOfDay(start);
+  final endParam   = _normalizeMonthlyEnd(end);
   final res = await dio.get(
     'schedule/resource-monthly/',
     queryParameters: {
       'resource_id': resourceId,
-      'start'      : start.toIso8601String(),
-      'end'        : end.toIso8601String(),
+      'start'      : startParam.toIso8601String(),
+      'end'        : endParam.toIso8601String(),
     },
   );
 

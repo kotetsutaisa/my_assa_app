@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/models/resource_model.dart';
@@ -7,7 +6,8 @@ import 'package:frontend/models/member_model.dart';               // ★ メン�
 import 'package:frontend/providers/resource_schedule_provider.dart';
 import 'package:frontend/providers/team_member_provider.dart';    // ★ 一覧取得プロバイダー
 import 'package:frontend/utils/add_schedule_helper.dart';
-import 'package:frontend/utils/constants.dart';
+import 'package:frontend/utils/image_helper.dart';
+import 'package:frontend/widgets/common/avatar.dart';
 
 import 'package:frontend/widgets/schedule_widget/date_dropdown_picker.dart';
 import 'package:frontend/widgets/schedule_widget/label_with_button_row.dart';
@@ -65,13 +65,6 @@ class _CreateResourceSchedulePage extends ConsumerState<CreateResourceSchedulePa
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(msg)));
 
-
-  String resolveImageUrl(String path) {
-    if (path.startsWith('http')) return path;
-    final base = apiBaseUrl.replaceFirst(RegExp(r'/api/?$'), '');
-    return '$base$path';
-  }
-
   /* ─── メンバーセレクター ─── */
   Future<void> _showMemberSelector() async {
     final allMembers = await ref.read(teamMemberListProvider.future);
@@ -109,15 +102,11 @@ class _CreateResourceSchedulePage extends ConsumerState<CreateResourceSchedulePa
                       final m = allMembers[i];
                       final checked = temp.any((e) => e.id == m.id);
 
-                      final avatar = CircleAvatar(
+                      final avatar = buildAvatar(
+                        context: context,
+                        imageUrl: m.avatarUrl,
                         radius: 18,
-                        backgroundImage: (m.avatarUrl != null && m.avatarUrl!.isNotEmpty)
-                            ? CachedNetworkImageProvider(resolveImageUrl(m.avatarUrl!))
-                            : null,
-                        child: (m.avatarUrl == null || m.avatarUrl!.isEmpty)
-                            ? Text(m.name.characters.first,
-                                style: const TextStyle(color: Colors.white))
-                            : null,
+                        resolveUrl: resolveImageUrl, // 不要なら省略
                       );
 
                       return CheckboxListTile(
@@ -241,26 +230,14 @@ class _CreateResourceSchedulePage extends ConsumerState<CreateResourceSchedulePa
                     spacing: 12,
                     runSpacing: 16,
                     children: _selectedDrivers.map((m) {
-                      final hasAvatar = (m.avatarUrl?.isNotEmpty ?? false);
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          CircleAvatar(
+                          buildAvatar(
+                            context: context,
+                            imageUrl: m.avatarUrl,
                             radius: 20,
-                            backgroundColor: hasAvatar
-                                ? null
-                                : Colors.white,
-                            backgroundImage: hasAvatar
-                                ? CachedNetworkImageProvider(
-                                    resolveImageUrl(m.avatarUrl!),      // ここは hasAvatar が true
-                                  )
-                                : null,
-                            child: hasAvatar
-                                ? null
-                                : Icon(Icons.person,
-                                    color: Theme.of(context).colorScheme.primary,
-                                    size: 20,
-                                  ),
+                            resolveUrl: resolveImageUrl,
                           ),
                           const SizedBox(height: 4),
                           SizedBox(

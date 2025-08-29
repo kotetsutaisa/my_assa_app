@@ -8,6 +8,8 @@ from .views import (
     TeamReportGeneratePersonalAPIView,
     PersonalReportApproveAPIView,
     PersonalReportRejectAPIView,
+    ClosingPreviewAPIView,
+    ClosingRunAPIView
 )
 
 urlpatterns = [
@@ -24,6 +26,9 @@ urlpatterns = [
     # チーム日報 → 個人日報の下書き一括生成
     path("team/generate-personal/", TeamReportGeneratePersonalAPIView.as_view(),
          name="team-report-generate-personal"),
+
+    path("closing/preview/", ClosingPreviewAPIView.as_view(), name="reports-closing-preview"),
+    path("closing/run/",     ClosingRunAPIView.as_view(),     name="reports-closing-run"),
 ]
 
 

@@ -52,3 +52,17 @@ class CanGeneratePersonalDraft(BasePermission):
             return True
 
         return False
+    
+
+
+class IsAdminOrClerk(BasePermission):
+    """
+    CustomUser.role in ('admin','clerk') を許可。
+    （is_staff/is_superuser も保険で許容）
+    """
+    def has_permission(self, request, view):
+        user = request.user
+        role = getattr(user, "role", None)
+        if isinstance(role, str) and role.lower() in ("admin", "clerk"):
+            return True
+        return bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))

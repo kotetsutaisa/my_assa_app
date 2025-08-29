@@ -786,3 +786,13 @@ class GeneratePersonalFromTeamSerializer(serializers.Serializer):
         }
 
 
+
+
+class ClosingPreviewSerializer(serializers.Serializer):
+    year_month = serializers.DateField(help_text="対象月の1日 (YYYY-MM-01)")
+    period_start = serializers.DateField()
+    period_end   = serializers.DateField()
+    counts = serializers.DictField(child=serializers.IntegerField())  # {"draft":0,"pending":2,"submitted":10,"locked":50}
+    pending = serializers.ListField(child=serializers.UUIDField(), required=False)   # 承認待ちPRのID
+    drafts  = serializers.ListField(child=serializers.UUIDField(), required=False)   # 下書きPRのID
+    already_closed = serializers.BooleanField()

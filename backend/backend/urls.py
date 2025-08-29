@@ -39,6 +39,7 @@ urlpatterns = [
     path('api/schedule/', include('schedule.urls')),
     path('api/resources/', include('resources.urls')),
     path('api/reports/', include('reports.urls')),
+    path("api/office/", include("office.urls")),
 ]
 
 if settings.DEBUG:

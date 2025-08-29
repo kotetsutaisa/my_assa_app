@@ -260,6 +260,21 @@ class _PersonalScheduleTabState extends ConsumerState<PersonalScheduleTab> {
         children  : pills,
       ),
     );
+
+    // return IgnorePointer(
+    //   child: Align(
+    //     alignment: Alignment.bottomCenter,
+    //     child: Padding(
+    //       padding: const EdgeInsets.fromLTRB(2, 0, 2, 2),
+    //       child: Wrap(
+    //         spacing   : 2,
+    //         runSpacing: 1,
+    //         alignment : WrapAlignment.center,
+    //         children  : pills,
+    //       ),
+    //     ),
+    //   ),
+    // );
   }
 }
 

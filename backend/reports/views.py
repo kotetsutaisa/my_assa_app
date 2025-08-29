@@ -1,5 +1,7 @@
 # reports/views.py
+from datetime import date as _date
 from django.utils.dateparse import parse_date
+from django.db import transaction
 from django.db.models import Prefetch
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -7,19 +9,36 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 
 from timeline.permissions import IsCompanyMember
-from companies.models import Company
+from companies.models import Company, TeamMember
 
-from .permissions import CanGeneratePersonalDraft
+from .permissions import CanGeneratePersonalDraft, IsAdminOrClerk
+from .utils.closing import calc_closing_window
 from .models import (
     TeamReport, TeamReportEntry,
     PersonalReport, PersonalReportEntry, ReportStatus,
+    ClosingPeriod,
 )
 from .serializers import (
     PersonalReportSerializer,
     TeamReportSerializer,
     GeneratePersonalFromTeamSerializer,
+    ClosingPreviewSerializer
 )
-from companies.models import TeamMember
+from office.models import CompanyPayrollPolicy
+
+
+def _parse_year_month(s: str) -> _date | None:
+    """
+    'YYYY-MM' → その月の1日 (date)
+    """
+    if not s:
+        return None
+    if len(s) == 7 and s[4] == "-":
+        s = f"{s}-01"
+    d = parse_date(s)
+    if d is None:
+        return None
+    return _date(d.year, d.month, 1)
 
 
 class PersonalReportListCreateAPIView(generics.ListCreateAPIView):
@@ -268,3 +287,102 @@ class TeamReportGeneratePersonalAPIView(APIView):
         result = ser.save()
         return Response(result, status=status.HTTP_201_CREATED)
 
+
+
+
+class ClosingPreviewAPIView(APIView):
+    permission_classes = [IsAdminOrClerk, IsCompanyMember]
+
+    def get(self, request):
+        # year_month=YYYY-MM（無ければ当月）
+        ym_str = request.query_params.get("year_month")
+        today  = _date.today()
+        year_month = _parse_year_month(ym_str) or _date(today.year, today.month, 1)
+
+        # 会社設定
+        company: Company = request.user.company
+        policy, _ = CompanyPayrollPolicy.objects.get_or_create(company=company)
+
+        win = calc_closing_window(year_month, policy.closing_day)
+
+        qs = PersonalReport.objects.filter(
+            company=company, date__gte=win.start, date__lte=win.end
+        )
+        counts = {
+            "draft": qs.filter(status=ReportStatus.DRAFT).count(),
+            "pending": qs.filter(status=ReportStatus.PENDING).count(),
+            "submitted": qs.filter(status=ReportStatus.SUBMITTED).count(),
+            "locked": qs.filter(status=ReportStatus.LOCKED).count(),
+        }
+        drafts  = list(qs.filter(status=ReportStatus.DRAFT).values_list("id", flat=True))
+        pending = list(qs.filter(status=ReportStatus.PENDING).values_list("id", flat=True))
+
+        # 既に締め済みか？
+        already_closed = ClosingPeriod.objects.filter(company=company, year_month=year_month, closed=True).exists()
+
+        data = {
+            "year_month": year_month,
+            "period_start": win.start,
+            "period_end": win.end,
+            "counts": counts,
+            "drafts": drafts,
+            "pending": pending,
+            "already_closed": already_closed,
+        }
+        ser = ClosingPreviewSerializer(data)
+        return Response(ser.data, status=200)
+    
+    
+
+class ClosingRunAPIView(APIView):
+    """
+    POST body: {"year_month": "YYYY-MM"}
+    - draft/pending が残っている場合: 409 を返す（仕様は好みで調整可）
+    - 既に締め済み: 400
+    """
+    permission_classes = [IsAdminOrClerk, IsCompanyMember]
+
+    @transaction.atomic
+    def post(self, request):
+        ym_str = request.data.get("year_month")
+        if not ym_str:
+            return Response({"detail": "year_month は必須です (YYYY-MM)."}, status=400)
+        year_month = _parse_year_month(ym_str)
+        if not year_month:
+            return Response({"detail": "year_month のフォーマットが不正です。例: 2025-07"}, status=400)
+
+        company: Company = request.user.company
+        policy, _ = CompanyPayrollPolicy.objects.get_or_create(company=company)
+        win = calc_closing_window(year_month, policy.closing_day)
+
+        if ClosingPeriod.objects.filter(company=company, year_month=year_month, closed=True).exists():
+            return Response({"detail": "この月は既に締め済みです。"}, status=400)
+
+        qs = PersonalReport.objects.select_for_update().filter(
+            company=company, date__gte=win.start, date__lte=win.end
+        )
+        count_draft   = qs.filter(status=ReportStatus.DRAFT).count()
+        count_pending = qs.filter(status=ReportStatus.PENDING).count()
+        if count_draft or count_pending:
+            return Response({
+                "detail": "未提出/承認待ちが残っています。",
+                "draft": count_draft, "pending": count_pending
+            }, status=409)
+
+        # submitted → locked に更新
+        updated = qs.filter(status=ReportStatus.SUBMITTED).update(status=ReportStatus.LOCKED)
+
+        # ClosingPeriod を記録
+        cp, _ = ClosingPeriod.objects.get_or_create(company=company, year_month=year_month)
+        from django.utils import timezone as dj_tz
+        cp.closed = True
+        cp.closed_at = dj_tz.now()
+        cp.closed_by = request.user
+        cp.save(update_fields=["closed", "closed_at", "closed_by"])
+
+        return Response({
+            "closed": True,
+            "period_start": win.start,
+            "period_end": win.end,
+            "locked_count": updated,
+        }, status=200)

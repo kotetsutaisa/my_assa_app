@@ -1,5 +1,5 @@
 /// バックエンドの Role(models.TextChoices) と 1:1 対応
-enum UserRole { admin, manager, member, unknown }
+enum UserRole { admin, manager, clerk, member, unknown }
 
 extension UserRoleX on UserRole {
   /// API 文字列（POST/PATCH 時に利用）
@@ -7,6 +7,7 @@ extension UserRoleX on UserRole {
     switch (this) {
       case UserRole.admin:   return 'admin';
       case UserRole.manager: return 'manager';
+      case UserRole.clerk: return 'clerk';
       case UserRole.member:  return 'member';
       case UserRole.unknown: return 'member'; // Fallback 送信時は member に寄せる等
     }
@@ -17,6 +18,7 @@ extension UserRoleX on UserRole {
     switch (this) {
       case UserRole.admin:   return '管理者';
       case UserRole.manager: return '部長';
+      case UserRole.clerk: return '事務員';
       case UserRole.member:  return '一般';
       case UserRole.unknown: return '一般';
     }
@@ -31,6 +33,7 @@ extension UserRoleX on UserRole {
     switch (value) {
       case 'admin':   return UserRole.admin;
       case 'manager': return UserRole.manager;
+      case 'clerk': return UserRole.clerk;
       case 'member':  return UserRole.member;
       default:        return UserRole.unknown;
     }

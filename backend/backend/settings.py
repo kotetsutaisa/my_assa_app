@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'schedule',
     'resources',
     'reports',
+    'office',
 ]
 
 MIDDLEWARE = [

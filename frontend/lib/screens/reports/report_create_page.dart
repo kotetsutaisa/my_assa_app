@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/api/personal_reports_api.dart';
 import 'package:frontend/api/reports_api.dart';
 import 'package:frontend/api/schedule_api.dart';
+import 'package:frontend/exceptions/user_role.dart';
 import 'package:frontend/models/member_model.dart';
 import 'package:frontend/models/reports/personal_report_entry_model.dart';
 import 'package:frontend/models/reports/personal_report_model.dart';
@@ -684,6 +685,8 @@ class _ReportsCreatePageState extends ConsumerState<ReportsCreatePage> {
       username: m.name,
       accountId: '',
       iconimg: m.avatarUrl,
+      role: UserRole.member,
+      teams: const [],
     );
   }
 
@@ -784,7 +787,15 @@ class _ReportsCreatePageState extends ConsumerState<ReportsCreatePage> {
 
         if (!isUpdate) {
           final teamSummary = TeamSummaryModel.fromJson({'id': _teamId!, 'name': _teamName ?? ''});
-          final createdByStub = SimpleUserModel(id: 0, email: '', username: '', accountId: '', iconimg: null);
+          final createdByStub = SimpleUserModel(
+            id: 0,
+            email: '',
+            username: '',
+            accountId: '',
+            iconimg: null,
+            role: UserRole.member,
+            teams: const [],
+          );
 
           final model = TeamReportModel(
             id: '',
@@ -881,7 +892,7 @@ class _ReportsCreatePageState extends ConsumerState<ReportsCreatePage> {
         } else {
           // 既存が無い → 新規作成（従来ロジック）
           final entries = _buildPersonalEntriesFromRows();
-          final stubUser = SimpleUserModel(id: 0, email: '', username: '', accountId: '', iconimg: null);
+          final stubUser = SimpleUserModel(id: 0, email: '', username: '', accountId: '', iconimg: null, role: UserRole.member, teams: const [],);
           final model = PersonalReportModel(
             id: '',
             date: _date,
@@ -1036,7 +1047,8 @@ class _ReportsCreatePageState extends ConsumerState<ReportsCreatePage> {
 
       // 当日の 00:00～23:59 でスケジュール検索
       final dayStart = DateTime(date.year, date.month, date.day);
-      final dayEnd   = dayStart.add(const Duration(days: 1));
+      // サーバが「< end」でも「<= end」でも必ず当日が入るように、23:59:59.999 として送る
+      final dayEnd   = DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
 
       final schedules = await fetchTeamMonthlySchedules(
         dio: dio,
@@ -1065,7 +1077,7 @@ class _ReportsCreatePageState extends ConsumerState<ReportsCreatePage> {
           // ScheduleModel → _EntryRow へ変換
           _rows.add(
             _EntryRow(
-              members: List<SimpleUserModel>.from(sch.members),
+              members: _asSimpleList(sch.members),
               start  : TimeOfDay.fromDateTime(sch.startTime.toLocal()),
               end    : TimeOfDay.fromDateTime(sch.endTime.toLocal()),
             )
@@ -1085,8 +1097,8 @@ class _ReportsCreatePageState extends ConsumerState<ReportsCreatePage> {
       final dio = ref.read(dioProvider);
       final list = await fetchTeamReports(
         dio,
-        start: date,
-        end  : date,
+        start: DateTime(date.year, date.month, date.day),
+        end  : DateTime(date.year, date.month, date.day, 23, 59, 59, 999),
         teamId: teamId,
         memberId: null,
       );
